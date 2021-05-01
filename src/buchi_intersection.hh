@@ -14,9 +14,9 @@ Buchi<A> intersection(Buchi<A> const& b1, Buchi<A> const& b2) {
   };
 
   // First three loops are used to enumerate all triplets (s1, s2, x)
-  for (State const& state1 : b1.states()) {
+  for (State const& state1 : b1.getStates()) {
     bool s1Initial = b1.initial(state1);
-    for (State const& state2 : b2.states()) {
+    for (State const& state2 : b2.getStates()) {
       bool s2Initial = b2.initial(state2);
       for (int x = 0; x < 3; ++x) {
         // To generate the set of transitions for a given state (s1, s2, x) we must enumerate all

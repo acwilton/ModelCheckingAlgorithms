@@ -1,4 +1,5 @@
 #include <unordered_set>
+#include <unordered_map>
 #include <functional>
 
 template <typename Alphabet>
@@ -7,7 +8,7 @@ public:
   struct Transition {
     Alphabet label;
     int target;
-  }
+  };
 
   class State {
   public:
@@ -46,7 +47,7 @@ public:
   Buchi(StateSet states, StateSubset initialStates, StateCharFunc acceptingStates)
     : states(states),
       initialStates(initialStates),
-      acceptinStates(acceptingStates)
+      acceptingStates(acceptingStates)
     {}
   
   Buchi(Buchi const&) = default;
@@ -60,11 +61,11 @@ public:
     return states.size();
   }
 
-  const StateSet& states() const noexcept {
+  const StateSet& getStates() const noexcept {
     return states;
   }
 
-  const StateSubset& initialStates() const noexcept {
+  const StateSubset& getInitialStates() const noexcept {
     return initialStates;
   }
 
@@ -77,7 +78,7 @@ public:
   }
 
   bool initial(int id) {
-    return inititalStates.find(id) != initialStates.end();
+    return initialStates.find(id) != initialStates.end();
   }
 
   bool accepting(State const& state) {
