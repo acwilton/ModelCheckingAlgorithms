@@ -4,7 +4,10 @@
 template <typename Alphabet>
 class Buchi {
 public:
-  using Transition = std::pair<Alphabet, StateSet::iterator>;
+  struct Transition {
+    Alphabet label;
+    int target;
+  }
 
   class State {
   public:
@@ -35,27 +38,63 @@ public:
     std::vector<Transition> transitions;
   };
 
-  using StateSet = std::unordered_set<State>;
-  using StateSubset = std::function<bool(State const&)>;
+  using StateSet = std::unordered_map<int, State>;
+  using StateSubset = std::unordered_set<int>;
+  using StateCharFunc = std::function<bool(State const&)>;
 
 
-  Buchi(StateSet states, StateSubset initialStates, StateSubset acceptingStates)
+  Buchi(StateSet states, StateSubset initialStates, StateCharFunc acceptingStates)
     : states(states),
       initialStates(initialStates),
       acceptinStates(acceptingStates)
     {}
+  
   Buchi(Buchi const&) = default;
   Buchi(Buchi&&) = default;
   ~Buchi() = default;
 
+  Buchi& operator=(Buchi const&) = default;
+  Buchi& operator=(Buchi&&) = default;
   
+  int size() const noexcept {
+    return states.size();
+  }
+
+  const StateSet& states() const noexcept {
+    return states;
+  }
+
+  const StateSubset& initialStates() const noexcept {
+    return initialStates;
+  }
+
+  const State& at(int id) const{
+    return states.at(id);
+  }
+
+  bool initial(State const& state) {
+    return initial(state.getId());
+  }
+
+  bool initial(int id) {
+    return inititalStates.find(id) != initialStates.end();
+  }
+
+  bool accepting(State const& state) {
+    return acceptingStates(state);
+  }
+
+  bool accepting(int id) {
+    return accepting(states.at(id));
+  }
 
 private:
-  StateSet states;
-  StateSubset initialStates;
-  StateSubset acceptingStates;
+  const StateSet states;
+  const StateSubset initialStates;
+  const StateCharFunc acceptingStates;
 };
 
+/*
 namespace std {
   template <typename Alphabet>
   struct hash<Buchi<Alphabet>::State> {
@@ -64,3 +103,4 @@ namespace std {
     }
   };
 }
+*/
