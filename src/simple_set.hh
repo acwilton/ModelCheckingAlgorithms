@@ -14,9 +14,10 @@ namespace mc {
   class simple_set {
   public:
     // Leaky abstraction here. Reveals what the underlying type is but works for now.
-    using iterator = std::vector<T>::iterator;
-    using const_iterator = std::vector<T>::const_iterator;
-    
+    using iterator = typename std::vector<T>::const_iterator;
+    using const_iterator = typename std::vector<T>::const_iterator;
+
+    simple_set() = default;
     simple_set(simple_set const&) = default;
     simple_set(simple_set&&) = default;
     ~simple_set() = default;
@@ -27,10 +28,10 @@ namespace mc {
     iterator begin() {
       return set.begin();
     }
-    iterator begin() const {
+    const_iterator begin() const {
       return set.begin();
     }
-    iterator cbegin() const {
+    const_iterator cbegin() const {
       return set.cbegin();
     }
     
@@ -46,7 +47,7 @@ namespace mc {
 
     iterator find(const T& value) {
       // Call the const version of find.
-      return const_cast<iterator>(static_cast<const simple_set*>(this)->find(value));
+      return static_cast<const simple_set*>(this)->find(value);
     }
     const_iterator find(const T& value) const {
       for (auto iter = cbegin(); iter != cend(); ++iter) {
@@ -69,10 +70,10 @@ namespace mc {
       iterator emplaced_iter = set.emplace(cend(), std::forward<Args>(args)...);
       iterator matchIter = find(*emplaced_iter);
       if (matchIter == emplaced_iter) {
-        return std::make_tuple(emplaced_iter, true);
+        return std::make_pair(emplaced_iter, true);
       }
-      set.erace(emplaced_iter);
-      return (matchIter, false);
+      set.erase(emplaced_iter);
+      return std::make_pair(matchIter, false);
     }
 
     iterator erase(const_iterator pos) {
@@ -103,13 +104,14 @@ namespace mc {
     }
 
   private:
-    template <tyepename F>
-    auto forwarding_insert(F&& value) {
+    template <typename F>
+    std::pair<iterator, bool> forwarding_insert(F&& value) {
       iterator matchIter = find(value);
       if (matchIter == end()) {
-        return std::make_tuple(set.insert(matchIter, std::forward<F>(value)), true);
+        set.emplace_back(std::forward<F>(value));
+        return std::make_pair(set.end()-1, true);
       }
-      return std::make_tuple(matchIter, false);
+      return std::make_pair(matchIter, false);
     }
     
     std::vector<T> set;

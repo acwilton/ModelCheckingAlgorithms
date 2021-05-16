@@ -17,18 +17,14 @@ namespace mc {
   public:
     using value_type = std::pair<const K, V>;
   private:
-    struct KeyEquality {
-      bool operator()(const value_type& kv1, const value_type& kv2) {
-        return KEqual{}(kv1.first, kv2.first);
-      }
-    };
-    using underlying_representation = simple_set<value_type, KeyEquality>;
+    using underlying_representation = std::vector<std::pair<K,V>>;
     
   public:
     // Leaky abstraction here. Reveals what the underlying type is but works for now.
-    using iterator = underlying_representation::iterator;
-    using const_iterator = underlying_representation::const_iterator;
-    
+    using iterator = typename underlying_representation::iterator;
+    using const_iterator = typename underlying_representation::const_iterator;
+
+    simple_map() = default;
     simple_map(simple_map const&) = default;
     simple_map(simple_map&&) = default;
     ~simple_map() = default;
@@ -39,10 +35,10 @@ namespace mc {
     iterator begin() {
       return map.begin();
     }
-    iterator begin() const {
+    const_iterator begin() const {
       return map.begin();
     }
-    iterator cbegin() const {
+    const_iterator cbegin() const {
       return map.cbegin();
     }
     
@@ -57,29 +53,45 @@ namespace mc {
     }
 
     iterator find(const K& key) {
-      return map.find(std::make_pair(key, V{}));
+      return remove_iterator_constness(static_cast<const simple_map*>(this)->find(key));
     }
     const_iterator find(const K& key) const {
-      return map.find(std::make_pair(key, V{}));
+      for (auto iter = cbegin(); iter != cend(); ++iter) {
+        if (KEqual{}(iter->first, key)) {
+          return iter;
+        }
+      }
+      return cend();
     }
 
     std::pair<iterator,bool> insert(const value_type& kv) {
-      return map.insert(kv);
+      return forwarding_insert(kv);
     }
     std::pair<iterator,bool> insert(value_type&& kv) {
-      return map.insert(std::move(kv));
+      return forwarding_insert(std::move(kv));
     }
 
     template <typename... Args>
     std::pair<iterator,bool> emplace(Args&&... args) {
-      map.emplace(std::forward<Args>(args)...);
+      iterator emplaced_iter = map.emplace(cend(), std::forward<Args>(args)...);
+      iterator matchIter = find(emplaced_iter->first);
+      if (matchIter == emplaced_iter) {
+        return std::make_pair(emplaced_iter, true);
+      }
+      map.erase(emplaced_iter);
+      return std::make_pair(matchIter, false);
     }
 
     iterator erase(const_iterator pos) {
       return map.erase(pos);
     }
     size_t erase(const K& key) {
-      map.erase(std::make_pair(key, V{}));
+      auto matchIter = find(key);
+      if (matchIter != end()) {
+        erase(matchIter);
+        return 1;
+      }
+      return 0;
     }
 
     void clear() {
@@ -106,7 +118,7 @@ namespace mc {
     }
 
     size_t count(const K& key) const {
-      return map.count(std::make_tuple(key, V{}));
+      return find(key) == end() ? 0 : 1;
     }
 
     size_t size() const {
@@ -117,9 +129,30 @@ namespace mc {
     }
 
   private:
+    std::pair<K,V> value_type_conversion(value_type const& kv) {
+      return std::make_pair(kv.first, kv.second);
+    }
+    std::pair<K,V> value_type_conversion(value_type&& kv) {
+      return std::make_pair(std::move(kv.first), std::move(kv.second));
+    }
+
+    template <typename F>
+    std::pair<iterator, bool> forwarding_insert(F&& forward_kv) {
+      iterator matchIter = find(forward_kv.first);
+      if (matchIter == end()) {
+        map.emplace_back(value_type_conversion(std::forward<F>(forward_kv)));
+        return std::make_pair(map.end()-1, true);
+      }
+      return std::make_pair(matchIter, false);
+    }
+    
     template <typename F>
     V& forwarding_access(F&& forward_key) {
-      return map.insert(std::forward<F>(key)).first->second;
+      return insert(std::make_pair(std::forward<F>(forward_key), V{})).first->second;
+    }
+
+    iterator remove_iterator_constness(const_iterator it) {
+      return map.erase(it,it);
     }
 
     underlying_representation map;

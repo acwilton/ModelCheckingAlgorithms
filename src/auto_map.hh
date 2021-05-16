@@ -24,11 +24,12 @@ namespace mc {
     using value_type = std::pair<const K, V>;
     // The conditional check to determine which underlying representation to use
     using map_representation =
-      std::conditional<traits::hashable<K>::value, std::unordered_map<K,V>,
-                       std::conditional<traits::comparable<K>::value, std::map<K,V>, simple_map<K,V>>>;
-    using iterator = map_representation::iterator;
-    using const_iterator = map_representation::const_iterator;
+      std::conditional_t<traits::hashable<K>::value, std::unordered_map<K,V>,
+                       std::conditional_t<traits::comparable<K>::value, std::map<K,V>, simple_map<K,V>>>;
+    using iterator = typename map_representation::iterator;
+    using const_iterator = typename map_representation::const_iterator;
 
+    auto_map() = default;
     auto_map(auto_map const&) = default;
     auto_map(auto_map&&) = default;
     auto_map(map_representation const& map) : map(map) {}
