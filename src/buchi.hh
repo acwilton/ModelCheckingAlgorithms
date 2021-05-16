@@ -37,7 +37,7 @@ namespace mc {
     }
 
     bool initial(State const& state) const {
-      return initialStates.find(state) != initialStates.end();
+      return static_cast<bool>(initialStates.count(state));
     }
 
     auto_map<Alphabet, State> getTransitions(State const& state) const{
