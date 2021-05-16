@@ -1,58 +1,55 @@
 #include "buchi.hh"
 
-template <typename A>
-Buchi<A> intersection(Buchi<A> const& b1, Buchi<A> const& b2) {
-  int interectionSize = b1.size() * b2.size() * 3;
-  
-  Buchi<A>::StateSet intersectionStates;
-  intersectionStates.reserve(interectionSize);
-  Buchi<A>::StateSubset initialStates;
-  Buchi<A>::StateSubset acceptingStates;
+#ifndef BUCHI_INTERSECTION_HH
+#define BUCHI_INTERSECTION_HH
 
-  auto targetId = [](int id1, int id2, int x) {
-    return id1 * b2.size() * 3 + id2 * 3 + x;
-  };
+namespace mc {
 
-  // First three loops are used to enumerate all triplets (s1, s2, x)
-  for (State const& state1 : b1.getStates()) {
-    bool s1Initial = b1.initial(state1);
-    for (State const& state2 : b2.getStates()) {
-      bool s2Initial = b2.initial(state2);
-      for (int x = 0; x < 3; ++x) {
-        // To generate the set of transitions for a given state (s1, s2, x) we must enumerate all
-        // pairs of transitions (t1,t2) where t1 is a transition from s1 and t2 is a transition from s2
-        std::vector<Buchi<A>::Transition> newTransitions;
-        for (auto const& tran1 : state1.getTransitions()) {
-          for (auto const& tran2 : state2.getTransitions()) {
-            if (tran1.label == tran2.label) {
-              int y = x;
-              if (x == 0 && b1.accepting(tran1.target)) {
-                y = 1;
-              } else if (x == 1 && b2.accepting(tran2.target)) {
-                y = 2;
-              } else if (x == 2) {
-                y = 0;
-              }
-              newTransitions.emplace_back(tran1.label, targetId(tran1.getId(), tran2.getId(), y));
-            }
-          }
-        }
-        int newStateId = targetId(state1.getId(), state2.getId(), x);
-        Buchi<A>::State newState (newStateId, std::move(newTransitions));
-        intersectionStates.emplace(newStateId, newState);
-        if (x == 0 && s1Initial && s2Initial) {
-          initialStates.emplace(newStateId);
-        }
-        if (x == 2) {
-          acceptingStates.emplace(newStateId);
-        }
+  template <typename A, typename S1, typename S2>
+  auto intersection(Buchi<A,S1> const& b1, Buchi<A,S2> const& b2) {
+    using InterStateType = std::tuple<S1, S2, const int>;
+
+    // Initial state construction
+    auto_set<InterStateType> interInitialStates;
+    for (auto const& s1 : b1.getInitialStates()) {
+      for (auto const& s2 : b2.getInitialStates()) {
+        interInitialStates.emplace_back(s1, s2, 0);
       }
     }
+
+    // Definition of accepting states
+    auto interAcceptingStates = [](InterStateType const& s) {
+      return std::get<2>(s) == 2;
+    };
+
+    // Definition of state transition function
+    auto interStateTransitions = [&b1,&b2](InterStateType const& s) {
+      auto_map<A, InterStateType> transitions;
+      int x = std::get<2>(s);
+
+      auto const& b1Trans = b1.getTransitions(std::get<0>(s));
+      auto const& b2Trans = b2.getTransitions(std::get<1>(s));
+
+      for (auto const& [label, head] : b1Trans) {
+        auto matchTran = b2Trans.find(label);
+        if (matchTran != b2Trans.end()) {
+          int y = x;
+          if (x == 0 && b1.accepting(head)) {
+            y = 1;
+          } else if (x == 1 && b2.accepting(matchTran->second)) {
+            y = 2;
+          } else if (x == 2) {
+            y = 0;
+          }
+          transitions[label] = std::make_tuple(head, matchTran->second, y);
+        }
+      }
+      return transitions;
+    };
+
+    return Buchi<A, InterStateType>(interInitialStates, interStateTransitions, interAcceptingStates);
   }
 
-  return Buchi<A>(intersectionStates,
-                 initialStates,
-                 [acceptingStates] (State const& s) {
-                   return acceptingStates.find(s.getId()) != acceptingStates.end();
-                 });
 }
+
+#endif

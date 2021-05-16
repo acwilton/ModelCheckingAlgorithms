@@ -1,107 +1,58 @@
-#include <unordered_set>
-#include <unordered_map>
+#ifndef BUCHI_HH
+#define BUCHI_HH
+
+#include <vector>
+#include <map>
 #include <functional>
 
-template <typename Alphabet>
-class Buchi {
-public:
-  struct Transition {
-    Alphabet label;
-    int target;
-  };
+#include "auto_map.hh"
+#include "auto_set.hh"
 
-  class State {
+namespace mc {
+
+  template <typename Alphabet, typename State>
+  class Buchi {
   public:
-    State(int id, std::vector<Transition> transitions)
-      : id(id),
-        transitions(transitions)
+    using StateSet = auto_set<State>;
+    using StateTransitions = std::function<auto_map<Alphabet,State>(State const&)>;
+    using StateCharFunc = std::function<bool(State const&)>;
+
+
+    Buchi(StateSet initialStates, StateTransitions stateTransitions, StateCharFunc acceptingStates)
+      : initialStates(initialStates),
+        stateTransitions(stateTransitions),
+        acceptingStates(acceptingStates)
       {}
-    State(State const&) = default;
-    State(State&&) = default;
-    ~State() = default;
 
-    State& operator=(State const&) = default;
-    State& operator=(State&&) = default;
+    Buchi(Buchi const&) = default;
+    Buchi(Buchi&&) = default;
+    ~Buchi() = default;
 
-    bool operator==(State const& other) const noexcept {
-      return id == other.id;
+    Buchi& operator=(Buchi const&) = default;
+    Buchi& operator=(Buchi&&) = default;
+
+
+    const StateSet& getInitialStates() const {
+      return initialStates;
     }
 
-    int getId() const noexcept {
-      return id;
+    bool initial(State const& state) const {
+      return initialStates.find(state) != initialStates.end();
     }
-    const std::vector<Transition>& getTransitions() const noexcept {
-      return transitions;
+
+    auto_map<Alphabet, State> getTransitions(State const& state) const{
+      return stateTransitions(state);
     }
-    
+
+    bool accepting(State const& state) const {
+      return acceptingStates(state);
+    }
+
   private:
-    int id;
-    std::vector<Transition> transitions;
+    const StateSet initialStates;
+    const StateTransitions stateTransitions;
+    const StateCharFunc acceptingStates;
   };
 
-  using StateSet = std::unordered_map<int, State>;
-  using StateSubset = std::unordered_set<int>;
-  using StateCharFunc = std::function<bool(State const&)>;
-
-
-  Buchi(StateSet states, StateSubset initialStates, StateCharFunc acceptingStates)
-    : states(states),
-      initialStates(initialStates),
-      acceptingStates(acceptingStates)
-    {}
-  
-  Buchi(Buchi const&) = default;
-  Buchi(Buchi&&) = default;
-  ~Buchi() = default;
-
-  Buchi& operator=(Buchi const&) = default;
-  Buchi& operator=(Buchi&&) = default;
-  
-  int size() const noexcept {
-    return states.size();
-  }
-
-  const StateSet& getStates() const noexcept {
-    return states;
-  }
-
-  const StateSubset& getInitialStates() const noexcept {
-    return initialStates;
-  }
-
-  const State& at(int id) const{
-    return states.at(id);
-  }
-
-  bool initial(State const& state) {
-    return initial(state.getId());
-  }
-
-  bool initial(int id) {
-    return initialStates.find(id) != initialStates.end();
-  }
-
-  bool accepting(State const& state) {
-    return acceptingStates(state);
-  }
-
-  bool accepting(int id) {
-    return accepting(states.at(id));
-  }
-
-private:
-  const StateSet states;
-  const StateSubset initialStates;
-  const StateCharFunc acceptingStates;
-};
-
-/*
-namespace std {
-  template <typename Alphabet>
-  struct hash<Buchi<Alphabet>::State> {
-    std::size_t operator()(Buchi<Alphabet>::State const& state) const noexcept {
-      return std::hash<int>{}(state.getId());
-    }
-  };
 }
-*/
+#endif
