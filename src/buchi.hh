@@ -5,7 +5,6 @@
 #include <map>
 #include <functional>
 
-#include "auto_map.hh"
 #include "auto_set.hh"
 
 namespace mc {
@@ -14,7 +13,8 @@ namespace mc {
   class Buchi {
   public:
     using StateSet = auto_set<State>;
-    using StateTransitions = std::function<auto_map<Alphabet,State>(State const&)>;
+    using TransitionSet = auto_set<std::pair<Alphabet,State>>;
+    using StateTransitions = std::function<TransitionSet(State const&)>;
     using StateCharFunc = std::function<bool(State const&)>;
 
 
@@ -40,7 +40,7 @@ namespace mc {
       return static_cast<bool>(initialStates.count(state));
     }
 
-    auto_map<Alphabet, State> getTransitions(State const& state) const{
+    TransitionSet getTransitions(State const& state) const{
       return stateTransitions(state);
     }
 

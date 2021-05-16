@@ -14,11 +14,14 @@ namespace mc {
     using StateCharFunc = std::function<bool(State const&)>;
 
 
-    Kripke(StateSet initialStates, StateTransitions stateTransitions, LabelFunc labelingFunction, StateCharFunc acceptingStates)
+    Kripke(StateSet initialStates,
+           StateTransitions stateTransitions,
+           LabelFunc labelingFunction,
+           std::vector<StateCharFunc> fairnessConstraints = {[](State const&) { return true; }})
       : initialStates(initialStates),
         stateTransitions(stateTransitions),
         labelingFunction(labelingFunction),
-        acceptingStates(acceptingStates)
+        fairnessConstraints(fairnessConstraints)
       {}
 
     Kripke(Kripke const&) = default;
@@ -55,15 +58,18 @@ namespace mc {
       return validAPs;
     }
 
-    bool accepting(State const& state) const {
-      return acceptingStates(state);
+    size_t getNumConstraints() const {
+      return fairnessConstraints.size();
+    }
+    bool checkConstraint(int constraintNumber, State const& state) const {
+      return fairnessConstraints[constraintNumber](state);
     }
 
   private:
     const StateSet initialStates;
     const StateTransitions stateTransitions;
     const LabelFunc labelingFunction;
-    const StateCharFunc acceptingStates;
+    const std::vector<StateCharFunc> fairnessConstraints;
   };
 
 }
