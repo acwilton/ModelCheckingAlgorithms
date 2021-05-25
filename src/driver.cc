@@ -295,10 +295,8 @@ int main(int argc, char* argv[]) {
   if (!opt_buchis) {
     return -1;
   }
-  std::cout << "Parse Successful\n";
   auto [buchi1, buchi2] = *opt_buchis;
   auto buchiIntersection = mc::Intersection(buchi1, buchi2);
-  std::cout << "Intersection successful\n";
 
   auto opt_lasso = mc::FindAcceptingRun(buchiIntersection);
   if (opt_lasso) {
