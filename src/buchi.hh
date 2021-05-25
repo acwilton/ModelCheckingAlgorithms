@@ -49,9 +49,9 @@ namespace mc {
     }
 
   private:
-    const StateSet initialStates;
-    const StateTransitions stateTransitions;
-    const StateCharFunc acceptingStates;
+    StateSet initialStates;
+    StateTransitions stateTransitions;
+    StateCharFunc acceptingStates;
   };
 
 }

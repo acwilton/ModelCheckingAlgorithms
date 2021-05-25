@@ -4,21 +4,22 @@
 #include <vector>
 #include <optional>
 #include <utility>
+#include <any>
 
 #include "buchi.hh"
 
 namespace mc {
   // First component of Lasso is the sequence of elements up to, but not including the loop
   // Second component of Lasso is the loop of the lasso
-  typename <S>
+  template <typename S>
   using Lasso = std::pair<std::vector<S>, std::vector<S>>;
 
   // Hiding implementation details under a namespace that is not meant to be accessed.
   namespace _details_ {
     template <typename A, typename S>
-    std::optional<Lasso<S>> dfs2(Buchi<A,S> const& buchi, S const& q, std::vector<S> const& stack1, std::vector<S>& stack2, auto_set& flagged) {
+    std::optional<Lasso<S>> dfs2(Buchi<A,S> const& buchi, S const& q, std::vector<S> const& stack1, std::vector<S>& stack2, auto_set<S>& flagged) {
       flagged.insert(q);
-      for (auto& next : buchi.getTransitions(q)) {
+      for (auto& [_,next] : buchi.getTransitions(q)) {
         auto iter = stack1.begin();
         for(; iter != stack1.end(); ++iter) {
           if (*iter == next) {
@@ -28,16 +29,21 @@ namespace mc {
           }
         }
         if (flagged.count(next) == 0) {
-          return dfs2(buchi, next, stack_view, flagged);
+          stack2.push_back(next);
+          auto result = dfs2(buchi, next, stack1, stack2, flagged);
+          if (result) {
+            return result;
+          }
+          stack2.pop_back();
         }
       }
-      return std::nullopt_t;
+      return std::nullopt;
     }
     
     template <typename A, typename S>
     std::optional<Lasso<S>> dfs1(Buchi<A,S> const& buchi, S const& q, std::vector<S>& stack, auto_set<S>& hashed, auto_set<S>& flagged) {
       hashed.insert(q);
-      for (auto& next : buchi.getTransitions(q)) {
+      for (auto& [_,next] : buchi.getTransitions(q)) {
         if (hashed.count(next) == 0) {
           stack.push_back(next);
           auto result = dfs1(buchi, next, stack, hashed, flagged);
@@ -48,10 +54,10 @@ namespace mc {
         }
       }
       if (buchi.accepting(q)) {
-        std::vector<S> stack2;
+        std::vector<S> stack2 {q};
         return dfs2(buchi, q, stack, stack2, flagged);
       }
-      return std::nullopt_t;
+      return std::nullopt;
     }
   }
 
@@ -62,24 +68,23 @@ namespace mc {
     auto_set<S> hashed;
     auto_set<S> flagged;
     for (auto& initState : buchi.getInitialStates()) {
-      std::vector<S> stack;
-      stack_view.insert(initState);
+      std::vector<S> stack {initState};
       auto result = _details_::dfs1(buchi, initState, stack, hashed, flagged);
       if (result) {
         return result;
       }
     }
-    return std::nullopt_t;
+    return std::nullopt;
   }
 
   // Calculates the intersection of two buchi automata
   template <typename A, typename S1, typename S2>
   auto Intersection(Buchi<A,S1> const& b1, Buchi<A,S2> const& b2) {
-    using InterStateType = std::tuple<S1, S2, const int>;
+    using InterStateType = std::tuple<S1, S2, int>;
     using BuchiType = Buchi<A, InterStateType>;
 
     // Initial state construction
-    BuchiType::StateSet interInitialStates;
+    typename BuchiType::StateSet interInitialStates;
     for (auto const& s1 : b1.getInitialStates()) {
       for (auto const& s2 : b2.getInitialStates()) {
         interInitialStates.emplace(s1, s2, 0);
@@ -93,7 +98,7 @@ namespace mc {
 
     // Definition of state transition function
     auto interStateTransitions = [&b1,&b2](InterStateType const& s) {
-      BuchiType::TransitionSet transitions;
+      typename BuchiType::TransitionSet transitions;
       int x = std::get<2>(s);
 
       auto const& b1Trans = b1.getTransitions(std::get<0>(s));
@@ -119,6 +124,7 @@ namespace mc {
 
     return BuchiType(interInitialStates, interStateTransitions, interAcceptingStates);
   }
+
 }
 
 #endif
