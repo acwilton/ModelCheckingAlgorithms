@@ -45,6 +45,13 @@ namespace mc {
       set = init;
     }
 
+    bool operator==(auto_set const& rhs) {
+      return set == rhs.set;
+    }
+    bool operator!=(auto_set const& rhs) {
+      return set != rhs.set;
+    }
+
     iterator begin() {
       return set.begin();
     }

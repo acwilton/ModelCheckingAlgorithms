@@ -32,6 +32,13 @@ namespace mc {
       set = init;
     }
 
+    bool operator==(simple_set const& rhs) {
+      return set == rhs.set;
+    }
+    bool operator!=(simple_set const& rhs) {
+      return set != rhs.set;
+    }
+
     iterator begin() {
       return set.begin();
     }

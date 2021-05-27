@@ -46,6 +46,13 @@ namespace mc {
       map = init;
     }
 
+    bool operator==(auto_map const& rhs) {
+      return map == rhs.map;
+    }
+    bool operator!=(auto_map const& rhs) {
+      return map != rhs.map;
+    }
+
     iterator begin() {
       return map.begin();
     }
