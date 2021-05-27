@@ -16,8 +16,8 @@ namespace mc {
 
   // Hiding implementation details under a namespace that is not meant to be accessed.
   namespace _details_ {
-    template <typename A, typename S>
-    std::optional<Lasso<S>> dfs2(Buchi<A,S> const& buchi, S const& q, std::vector<S> const& stack1, std::vector<S>& stack2, auto_set<S>& flagged) {
+    template <typename S, typename A>
+    std::optional<Lasso<S>> dfs2(Buchi<S,A> const& buchi, S const& q, std::vector<S> const& stack1, std::vector<S>& stack2, auto_set<S>& flagged) {
       flagged.insert(q);
       for (auto& [_,next] : buchi.getTransitions(q)) {
         auto iter = stack1.begin();
@@ -40,8 +40,8 @@ namespace mc {
       return std::nullopt;
     }
     
-    template <typename A, typename S>
-    std::optional<Lasso<S>> dfs1(Buchi<A,S> const& buchi, S const& q, std::vector<S>& stack, auto_set<S>& hashed, auto_set<S>& flagged) {
+    template <typename S, typename A>
+    std::optional<Lasso<S>> dfs1(Buchi<S,A> const& buchi, S const& q, std::vector<S>& stack, auto_set<S>& hashed, auto_set<S>& flagged) {
       hashed.insert(q);
       for (auto& [_,next] : buchi.getTransitions(q)) {
         if (hashed.count(next) == 0) {
@@ -63,8 +63,8 @@ namespace mc {
 
   // Searches a Buchi automaton for an accepting run. Returns a lasso if one is found.
   // Otherwise returns std::nullopt_t which implies the Buchi's language is empty.
-  template <typename A, typename S>
-  std::optional<Lasso<S>> FindAcceptingRun(Buchi<A,S> const& buchi) {
+  template <typename S, typename A>
+  std::optional<Lasso<S>> FindAcceptingRun(Buchi<S,A> const& buchi) {
     auto_set<S> hashed;
     auto_set<S> flagged;
     for (auto& initState : buchi.getInitialStates()) {
@@ -77,11 +77,11 @@ namespace mc {
     return std::nullopt;
   }
 
-  // Calculates the intersection of two buchi automata
-  template <typename A, typename S1, typename S2>
-  auto Intersection(Buchi<A,S1> const& b1, Buchi<A,S2> const& b2) {
+  // Calculates the intersection of two buchi automata. M must be a functor with bool operator()(A1 const&, A2 const&) that determines if an element of A1 and an element of A2 are a "match".
+  template <typename S1, typename S2, typename A1, typename A2, typename M>
+  auto Intersection(Buchi<S1,A1> const& b1, Buchi<S2,A2> const& b2, M const& labelMatch) {
     using InterStateType = std::tuple<S1, S2, int>;
-    using BuchiType = Buchi<A, InterStateType>;
+    using BuchiType = Buchi<InterStateType, A1>;
 
     // Initial state construction
     typename BuchiType::StateSet interInitialStates;
@@ -106,7 +106,7 @@ namespace mc {
 
       for (auto const& [label1, head1] : b1Trans) {
         for (auto const& [label2, head2] : b2Trans) {
-          if (label1 == label2) {
+          if (labelMatch(label1,label2)) {
             int y = x;
             if (x == 0 && b1.accepting(head1)) {
               y = 1;
@@ -125,6 +125,10 @@ namespace mc {
     return BuchiType(interInitialStates, interStateTransitions, interAcceptingStates);
   }
 
+  template <typename S1, typename S2, typename A>
+  auto Intersection(Buchi<S1,A> const& b1, Buchi<S2,A> const& b2) {
+    return Intersection(b1, b2,std::equal_to<A>{});
+  }
 }
 
 #endif

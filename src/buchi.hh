@@ -9,7 +9,7 @@
 
 namespace mc {
 
-  template <typename Alphabet, typename State>
+  template <typename State, typename Alphabet>
   class Buchi {
   public:
     using StateSet = auto_set<State>;
