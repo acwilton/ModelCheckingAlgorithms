@@ -8,11 +8,16 @@
 
 #include "auto_set.hh"
 #include "auto_map.hh"
+#include "eq_function.hh"
+
+#include "ltl.hh"
 
 namespace mc {
   namespace lang {
     class LangParser {
     public:
+      using State = ProgramState; // TODO: Define ProgramState
+      using AP = EqFunction<bool(State const&)>;
       using Buchi = mc::Buchi<std::string, std::string>;
 
       LangParser(const char* filename)
@@ -47,6 +52,23 @@ namespace mc {
 
       void Parse() {
         if (stream.is_open()) {
+          // Parse LTL specification
+          if (!match_token(SPEC)) {
+            reportError("Must start file with specification using the \"spec\" keyword.");
+            return std::nullopt;
+          }
+          if (!match_token(ASSIGN)) {
+            reportError("Must follow spec with = sign.");
+            return std::nullopt;
+          }
+          if (auto opt_formula = match_formula(); opt_formula) {
+            // Do stuff
+          } else {
+            reportError("Unable to parse LTL formula.");
+            return std::nullopt;
+          }
+
+          // Parse processes
           bool procsExist = true;
           while (procsExist) {
             auto opt_process = match_process();
@@ -85,24 +107,87 @@ namespace mc {
       static constexpr auto GREATER = R"(>)";
       static constexpr auto LESS_EQ = R"(<=)";
       static constexpr auto GREAT_EQ = R"(>=)";
-      static constexpr auto AND = R"(&&)";
-      static constexpr auto OR = R"(||)";
-      static constexpr auto NOT = R"(!)";
 
       static constexpr auto PLUS = R"(+)";
       static constexpr auto MINUS = R"(-)";
 
-      static constexpr auto NUM = R"([1-9][0-9]*)";
+      static constexpr auto NUM = R"(-?[1-9][0-9]*)";
       static constexpr auto NAME = R"(\w[\w\d]*)";
 
-      static constexpr auto LOCAL = "V" + NUM;
+      static constexpr auto LOCAL = "L" + NUM;
       static constexpr auto SHARED = "S" + NUM;
-      static constexpr auto INPUT = "X" + NUM;
-      static constexpr auto OUTPUT = "Y";
+      static constexpr auto INPUT = "I" + NUM;
+      static constexpr auto OUTPUT = "O";
+
+      static constexpr auto SPEC = R"(spec)";
+      static constexpr auto DOT = R"(\.)";
+      static constexpr auto AND = R"(&&)";
+      static constexpr auto OR = R"(||)";
+      static constexpr auto NOT = R"(!)";
+      static constexpr auto UNTIL = "U";
+      static constexpr auto RELEASE = "R";
+      static constexpr auto FUTURE = "F";
+      static constexpr auto GLOBAL = "G";
 
       static constexpr auto PROC = R"(proc)";
       static constexpr auto IF = R"(IF)";
       static constexpr auto GOTO = R"(GOTO)";
+
+      std::optional<ltl::Formula<Program>> match_formula() {
+        if (!match_token(LPAREN)) {
+          return std::nullopt;
+        }
+
+        // The following two lambdas are introduced just to reduce code a bit
+        auto parse1AryFormula = [&](auto formulaFactory, std::string formulaName)
+          -> std::optional<ltl::Formula<State>> {
+          if (auto opt_sub = match_formula(); opt_sub) {
+            return std::make_optional(formulaFactory(*opt_sub));
+          }
+          reportError("Failed to parse subformula of " + formulaName);
+          return std::nullopt;
+        };
+        auto parse2AryFormula = [&](auto formulaFactory, std::string formulaName)
+          -> std::optional<ltl::Formula<State>> {
+          auto opt_sub1 = match_formula();
+          if (!opt_sub1) {
+            reportError("Failed to parse first subformula of "+formulaName);
+            return std::nullopt;
+          }
+          auto opt_sub2 = match_formula();
+          if (!opt_sub2) {
+            reportError("Failed to parse second subformula of "+formulaName);
+            return std::nullopt;
+          }
+          return std::make_optional(formulaFactor(*opt_sub1, *opt_sub2));
+        };
+
+        std::optional<Formula<State>> opt_formula;
+        if (match_token(GLOBAL)) {
+          opt_formula = parse1AryFormula(ltl::make_global<State,AP>, GLOBAL);
+        } else if (match_token(FUTURE)) {
+          opt_formula = parse1AryFormula(ltl::make_future<State,AP>, FUTURE);
+        } else if (match_token(UNTIL)) {
+          opt_formula = parse2AryFormula(ltl::make_until<State,AP>, UNTIL);
+        } else if (match_token(RELEASE)) {
+          opt_formula = parse2AryFormula(ltl::make_release<State,AP>, RELEASE);
+        } else if (match_token(NOT)) {
+          opt_formula = parse1AryFormula(ltl::make_not<State,AP>, NOT);
+        } else if (match_token(OR)) {
+          opt_formula = parse2AryFormula(ltl::make_or<State,AP>, OR);
+        } else if (match_token(AND)) {
+          opt_formula = parse2AryFormula(ltl::make_and<State,AP>, AND);
+        } else {
+          // If none of the other tokens passed then this must be an atomic proposition
+        }
+
+        if (!match_token(RPAREN)) {
+          reportError("Expected ) after formula.");
+          return std::nullopt;
+        }
+
+        return opt_formula;
+      }
 
       void match_process() {
         if (!match_token(PROC)) {
@@ -121,8 +206,8 @@ namespace mc {
         int numOfProcesses = 1;
         if (match_token(LSQUARE)) {
           auto opt_numProc = match_number();
-          if (!opt_numProc) {
-            reportError("Expected a number inside of [] after process name.");
+          if (opt_numProc.value_or(-1) < 1) {
+            reportError("Expected a positive number inside of [] after process name.");
             return std::nullopt;
           }
           numOfProcesses = *opt_numProc;
