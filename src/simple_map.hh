@@ -1,6 +1,8 @@
 #ifndef SIMPLE_MAP_HH
 #define SIMPLE_MAP_HH
 
+#include <vector>
+#include <initializer_list>
 #include <utility>
 #include <functional>
 #include <variant>
@@ -14,12 +16,11 @@ namespace mc {
    */
   template <typename K, typename V, typename KEqual = std::equal_to<K>>
   class simple_map {
-  public:
-    using value_type = std::pair<const K, V>;
   private:
     using underlying_representation = std::vector<std::pair<K,V>>;
     
   public:
+    using value_type = std::pair<const K, V>;
     // Leaky abstraction here. Reveals what the underlying type is but works for now.
     using iterator = typename underlying_representation::iterator;
     using const_iterator = typename underlying_representation::const_iterator;
@@ -27,10 +28,16 @@ namespace mc {
     simple_map() = default;
     simple_map(simple_map const&) = default;
     simple_map(simple_map&&) = default;
+    template <typename InputIt>
+    simple_map(InputIt first, InputIt last) : map(first, last) {}
+    simple_map(std::initializer_list<std::pair<K,V>> init) : map(init) {}
     ~simple_map() = default;
 
     simple_map& operator=(simple_map const&) = default;
     simple_map& operator=(simple_map&&) = default;
+    simple_map& operator=(std::initializer_list<std::pair<K,V>> init) {
+      map = init;
+    }
 
     iterator begin() {
       return map.begin();

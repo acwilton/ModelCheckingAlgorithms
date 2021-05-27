@@ -2,6 +2,7 @@
 #define SIMPLE_SET_HH
 
 #include <vector>
+#include <initializer_list>
 #include <utility>
 #include <functional>
 
@@ -20,10 +21,16 @@ namespace mc {
     simple_set() = default;
     simple_set(simple_set const&) = default;
     simple_set(simple_set&&) = default;
+    template <typename InputIt>
+    simple_set(InputIt first, InputIt last) : set(first, last) {}
+    simple_set(std::initializer_list<T> init) : set(init) {}
     ~simple_set() = default;
 
     simple_set& operator=(simple_set const&) = default;
     simple_set& operator=(simple_set&&) = default;
+    simple_set& operator=(std::initializer_list<T> init) {
+      set = init;
+    }
 
     iterator begin() {
       return set.begin();

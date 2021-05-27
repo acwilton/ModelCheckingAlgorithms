@@ -33,11 +33,17 @@ namespace mc {
     auto_set(auto_set&&) = default;
     auto_set(set_representation const& set) : set(set) {}
     auto_set(set_representation&& set) : set(std::move(set)) {}
+    template <typename InputIt>
+    auto_set(InputIt first, InputIt last) : set(first, last) {}
+    auto_set(std::initializer_list<T> init) : set(init) {}
 
     ~auto_set() = default;
 
     auto_set& operator=(auto_set const&) = default;
     auto_set& operator=(auto_set&&) = default;
+    auto_set& operator=(std::initializer_list<T> init) {
+      set = init;
+    }
 
     iterator begin() {
       return set.begin();

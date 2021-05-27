@@ -34,11 +34,17 @@ namespace mc {
     auto_map(auto_map&&) = default;
     auto_map(map_representation const& map) : map(map) {}
     auto_map(map_representation&& map) : map(std::move(map)) {}
+    template <typename InputIt>
+    auto_map(InputIt first, InputIt last) : map(first, last) {}
+    auto_map(std::initializer_list<std::pair<K,V>> init) : map(init) {}
 
     ~auto_map() = default;
 
     auto_map& operator=(auto_map const&) = default;
     auto_map& operator=(auto_map&&) = default;
+    auto_map& operator=(std::initializer_list<std::pair<K,V>> init) {
+      map = init;
+    }
 
     iterator begin() {
       return map.begin();
