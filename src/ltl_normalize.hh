@@ -56,19 +56,19 @@ namespace mc {
 
         case FormulaForm::Global:
           // (! (G f)) = (F (! f)) = (U true (! f))
-          return make_until(True, Normalize(make_not(sub.getSubFormulas()[0])));
+          return make_until(True, Normalize(make_not(sub.getSubformulas()[0])));
 
         case FormulaForm::Future:
           // (! (F f)) = (G (! f)) = (R false (! f))
-          return make_release(False, Normalize(make_not(sub.getSubFormulas()[0])));
+          return make_release(False, Normalize(make_not(sub.getSubformulas()[0])));
 
         case FormulaForm::Or:
-          return make_and(Normalize(make_not(sub.getSubFormulas()[0])),
-                          Normalize(make_not(sub.getSubFormulas()[1])));
+          return make_and(Normalize(make_not(sub.getSubformulas()[0])),
+                          Normalize(make_not(sub.getSubformulas()[1])));
 
         case FormulaForm::Or:
-          return make_or(Normalize(make_not(sub.getSubFormulas()[0])),
-                         Normalize(make_not(sub.getSubFormulas()[1])));
+          return make_or(Normalize(make_not(sub.getSubformulas()[0])),
+                         Normalize(make_not(sub.getSubformulas()[1])));
 
         case FormulaForm::Not:
           return Normalize(sub.getSubformulas()[0]);
