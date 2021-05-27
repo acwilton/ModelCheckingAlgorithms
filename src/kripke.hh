@@ -2,26 +2,31 @@
 #define KRIPKE_HH
 
 #include "auto_set.hh"
+#include "eq_function.hh"
 
 namespace mc {
 
-  template <typename AP, typename State>
+  template <typename State, typename AP = EqFunction<bool(State const&)>>
   class Kripke {
   public:
     using StateSet = auto_set<State>;
     using StateTransitions = std::function<auto_set<State>(State const&)>;
-    using LabelFunc = std::function<bool(State const&, AP const&)>;
     using StateCharFunc = std::function<bool(State const&)>;
+    using LabelingFunc = std::function<bool(State const&, AP const&)>;
 
 
     Kripke(StateSet initialStates,
            StateTransitions stateTransitions,
-           LabelFunc labelingFunction,
-           std::vector<StateCharFunc> fairnessConstraints = {[](State const&) { return true; }})
+           std::vector<StateCharFunc> fairnessConstraints = { [](State const&) {
+             return true;
+           } },
+           LabelingFunc labelingFunction = [](State const& s, AP const& ap) {
+             return ap(s);
+           })
       : initialStates(initialStates),
         stateTransitions(stateTransitions),
-        labelingFunction(labelingFunction),
-        fairnessConstraints(fairnessConstraints)
+        fairnessConstraints(fairnessConstraints),
+        labelingFunction(labelingFunction)
       {}
 
     Kripke(Kripke const&) = default;
@@ -40,22 +45,22 @@ namespace mc {
       return static_cast<bool>(initialStates.count(state));
     }
 
-    auto_set<State> getTransitions(State const& state) const{
+    auto_set<State> getTransitions(State const& state) const {
       return stateTransitions(state);
     }
 
-    bool checkAP(State const& state, AP const& ap) const {
-      return labelingFunction(state, ap);
+    bool checkAP(State const& s, AP const& ap) const {
+      return labelingFunction(s,ap);
     }
 
-    auto_set<AP> getAPSubset(State const& state, auto_set<AP> const& labelSet) {
-      auto_set<AP> validAPs;
+    auto_set<AP> getAPSubset(State const& state, auto_set<AP> const& labelSet) const {
+      std::vector<AP> validAPs;
       for (const auto& ap : labelSet) {
-        if (checkAtomicProp(state, ap)) {
-          validAPs.insert(ap);
+        if (checkAP(state, ap)) {
+          validAPs.emplace_back(ap);
         }
       }
-      return validAPs;
+      return auto_set(validAPs.begin(), validAPs.end());
     }
 
     size_t getNumConstraints() const {
@@ -66,10 +71,10 @@ namespace mc {
     }
 
   private:
-    const StateSet initialStates;
-    const StateTransitions stateTransitions;
-    const LabelFunc labelingFunction;
-    const std::vector<StateCharFunc> fairnessConstraints;
+    StateSet initialStates;
+    StateTransitions stateTransitions;
+    std::vector<StateCharFunc> fairnessConstraints;
+    LabelingFunc labelingFunction;
   };
 
 }
