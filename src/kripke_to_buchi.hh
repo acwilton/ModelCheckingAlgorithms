@@ -8,13 +8,12 @@
 
 namespace mc {
 
-  template <typename AP, typename State>
-  auto KripkeToBuchi(Kripke<AP, State> const& kripke, auto_set<AP> const& apSet) {
+  template <typename State, typename AP>
+  auto KripkeToBuchi(Kripke<State, AP> const& kripke, auto_set<AP> const& apSet) {
     // std::optional<State> is a cheap way to simulate State union {iota}
     // iota is represented by no value (i.e. by std::nullopt)
     using BuchiStateType = std::pair<std::optional<State>, size_t>;
-    using BuchiAlphabet = auto_set<AP>;
-    using BuchiType = Buchi<BuchiAlphabet, BuchiStateType>;
+    using BuchiType = Buchi<BuchiStateType, auto_set<AP>>;
 
     // Initial state construction
     auto_set<BuchiStateType> buchiInitialStates;
@@ -45,6 +44,7 @@ namespace mc {
         transitions.emplace(kripke.getAPSubset(next, apSet),
                             std::make_pair(std::make_optional(next), y));
       }
+      return transitions;
     };
 
     return BuchiType(buchiInitialStates, buchiStateTransitions, buchiAcceptingStates);
