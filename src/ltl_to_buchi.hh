@@ -62,7 +62,7 @@ namespace mc {
           outgoing[fromNodeId].insert(toNodeId);
         }
         void remove_relation(int fromNodeId, int toNodeId) {
-          incoming[toNodeId].erase(toNodeId);
+          incoming[toNodeId].erase(fromNodeId);
           outgoing[fromNodeId].erase(toNodeId);
         }
         std::unordered_map<int, std::unordered_set<int>> incoming;
