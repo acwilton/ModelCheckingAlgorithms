@@ -90,7 +90,7 @@ namespace mc {
           closed.insert(std::make_pair(q.id,q));
           auto nextNode = freshNode(q.nextSet, {}, {});
           nodeRelations.add_relation(q.id, nextNode.id);
-          open[nextNode.id] = nextNode;
+          open.insert(std::make_pair(nextNode.id,nextNode));
         }
       }
 
@@ -102,7 +102,7 @@ namespace mc {
                        Formula<AP> const& psi) {
         auto Split = [&nodeRelations,&q]() {
           LTLNode<AP> splitQ = freshNode(q.newSet,q.nowSet,q.nextSet);
-          for (int fromId : nodeRelations.incoming.at(q.id)) {//HERE
+          for (int fromId : nodeRelations.incoming.at(q.id)) {
             nodeRelations.add_relation(fromId, splitQ.id);
           }
           return splitQ;
@@ -117,7 +117,7 @@ namespace mc {
           LTLNode<AP> splitQ = Split();
           q.newSet.insert(psi.getSubformulas()[0]);
           splitQ.newSet.insert(psi.getSubformulas()[1]);
-          open[splitQ.id] = splitQ;
+          open.insert(std::make_pair(splitQ.id, splitQ));
           break;
         }
 
@@ -133,7 +133,7 @@ namespace mc {
           q.newSet.insert(psi.getSubformulas()[1]);
           splitQ.newSet.insert(psi.getSubformulas()[0]);
           splitQ.nextSet.insert(psi);
-          open[splitQ.id] = splitQ;
+          open.insert(std::make_pair(splitQ.id, splitQ));
           break;
         }
 
@@ -143,7 +143,7 @@ namespace mc {
           q.newSet.insert(psi.getSubformulas()[1]);
           splitQ.newSet.insert(psi.getSubformulas()[1]);
           splitQ.nextSet.insert(psi);
-          open[splitQ.id] = splitQ;
+          open.insert(std::make_pair(splitQ.id, splitQ));
           break;
         }
 
@@ -169,7 +169,7 @@ namespace mc {
       _details_::NodeRelations nodeRelations{};
 
       auto firstNode = _details_::freshNode<AP>({formula}, {}, {});
-      open[firstNode.id] = firstNode;
+      open.insert(std::make_pair(firstNode.id, firstNode));
       nodeRelations.add_relation(-1, firstNode.id);
 
       while (!open.empty()) {
@@ -186,8 +186,8 @@ namespace mc {
 
       // The set of initial states are precisely the nodes in closed that contain -1 in their incomingNodes set.
       auto_set<LTLNode> initStates;
-      for (auto& startId : nodeRelations.outgoing.at(-1)) { //HERE
-        initStates.insert(closed.at(startId)); //HERE
+      for (auto& startId : nodeRelations.outgoing.at(-1)) {
+        initStates.insert(closed.at(startId));
       }
 
       std::vector<typename Kripke::StateCharFunc> fairnessConstraints;
@@ -203,8 +203,8 @@ namespace mc {
           initStates,
           [&closed,&nodeRelations](LTLNode const& node) {
             auto_set<LTLNode> nextSet;
-            for (auto nextId : nodeRelations.outgoing.at(node.id)) { //HERE
-              nextSet.insert(closed.at(nextId));//HERE
+            for (auto nextId : nodeRelations.outgoing.at(node.id)) {
+              nextSet.insert(closed.at(nextId));
             }
             return nextSet;
           },
