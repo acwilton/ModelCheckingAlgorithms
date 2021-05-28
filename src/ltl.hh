@@ -10,68 +10,7 @@
 
 namespace mc {
   namespace ltl {
-    template <typename State, typename AP = EqFunction<bool(State const&)>>
-    class Formula;
-
-    template <typename State, typename AP = EqFunction<bool(State const&)>>
-    Formula<State, AP> make_atomic(AP const& atomic) {
-      return Formula<State, AP>(atomic);
-    }
-
-    template <typename F, typename State, typename AP = EqFunction<bool(State const&)>>
-    Formula<State, AP> make_atomic(F const& atomic) {
-      return make_atomic<State, AP>(AP(atomic));
-    }
-
-    template <typename State, typename AP = EqFunction<bool(State const&)>>
-    Formula<State, AP> make_not(Formula<State, AP> const& sub1) {
-      return (sub1.form() == FormulaForm::Atomic)
-        ? make_atomic([&ap = sub1.getAP()](State const& s) {
-            return !ap(s);
-          })
-        : Formula<State, AP>(FormulaForm::Not, sub1);
-    }
-
-    template <typename State, typename AP = EqFunction<bool(State const&)>>
-    Formula<State, AP> make_or(Formula<State, AP> const& sub1, Formula<State, AP> const& sub2) {
-      return (sub1.form() == FromulaForm::Atomic && sub2.form() == FormulaForm::Atomic)
-        ? make_atomic([&ap1 = sub1.getAP(), &ap2 = sub2.getAP()](State const& s) {
-            return ap1(s) || ap2(s);
-          })
-        : Formula<State, AP>(FormulaForm::Or, sub1, sub2);
-    }
-
-    template <typename State, typename AP = EqFunction<bool(State const&)>>
-    Formula<State, AP> make_and(Formula<State, AP> const& sub1, Formula<State, AP> const& sub2) {
-
-      return (sub1.form() == FromulaForm::Atomic && sub2.form() == FormulaForm::Atomic)
-        ? make_atomic([&ap1 = sub1.getAP(), &ap2 = sub2.getAP()](State const& s) {
-            return ap1(s) && ap2(s);
-          })
-        : Formula<State, AP>(FormulaForm::And, sub1, sub2);
-    }
-
-    template <typename State, typename AP = EqFunction<bool(State const&)>>
-    Formula<State, AP> make_global(Formula<State, AP> const& sub1) {
-      return Formula<State, AP>(FormulaForm::Global, sub1);
-    }
-
-    template <typename State, typename AP = EqFunction<bool(State const&)>>
-    Formula<State, AP> make_future(Formula<State, AP> const& sub1) {
-      return Formula<State, AP>(FormulaForm::Future, sub1);
-    }
-
-    template <typename State, typename AP = EqFunction<bool(State const&)>>
-    Formula<State, AP> make_until(Formula<State, AP> const& sub1, Formula<State, AP> const& sub2) {
-      return Formula<State, AP>(FormulaForm::Until, sub1, sub2);
-    }
-
-    template <typename State, typename AP = EqFunction<bool(State const&)>>
-    Formula<State, AP> make_release(Formula<State, AP> const& sub1, Formula<State, AP> const& sub2) {
-      return Formula<State, AP>(FormulaForm::Release, sub1, sub2);
-    }
-
-    enum class FormulaForm = {
+    enum class FormulaForm {
       Atomic,
       Not,
       Or,
@@ -81,8 +20,69 @@ namespace mc {
       Until,
       Release
     };
+    
+    template <typename AP>
+    class Formula;
 
-    template <typename State, typename AP>
+    template <typename AP>
+    Formula<AP> make_atomic(AP const& atomic) {
+      return Formula<AP>(atomic);
+    }
+
+    template <typename F, typename AP>
+    Formula<AP> make_atomic(F const& atomic) {
+      return make_atomic<AP>(AP(atomic));
+    }
+
+    template <typename AP>
+    Formula<AP> make_not(Formula<AP> const& sub1) {
+      return (sub1.form() == FormulaForm::Atomic)
+        ? make_atomic<AP>([ap = sub1.getAP()](auto const& s) {
+            return !ap(s);
+          })
+        : Formula<AP>(FormulaForm::Not, sub1);
+    }
+
+    template <typename AP>
+    Formula<AP> make_or(Formula<AP> const& sub1, Formula<AP> const& sub2) {
+      return (sub1.form() == FormulaForm::Atomic && sub2.form() == FormulaForm::Atomic)
+        ? make_atomic<AP>([ap1 = sub1.getAP(), ap2 = sub2.getAP()](auto const& s) {
+            return ap1(s) || ap2(s);
+          })
+        : Formula<AP>(FormulaForm::Or, sub1, sub2);
+    }
+
+    template <typename AP>
+    Formula<AP> make_and(Formula<AP> const& sub1, Formula<AP> const& sub2) {
+
+      return (sub1.form() == FormulaForm::Atomic && sub2.form() == FormulaForm::Atomic)
+        ? make_atomic<AP>([ap1 = sub1.getAP(), ap2 = sub2.getAP()](auto const& s) {
+            return ap1(s) && ap2(s);
+          })
+        : Formula<AP>(FormulaForm::And, sub1, sub2);
+    }
+
+    template <typename AP>
+    Formula<AP> make_global(Formula<AP> const& sub1) {
+      return Formula<AP>(FormulaForm::Global, sub1);
+    }
+
+    template <typename AP>
+    Formula<AP> make_future(Formula<AP> const& sub1) {
+      return Formula<AP>(FormulaForm::Future, sub1);
+    }
+
+    template <typename AP>
+    Formula<AP> make_until(Formula<AP> const& sub1, Formula<AP> const& sub2) {
+      return Formula<AP>(FormulaForm::Until, sub1, sub2);
+    }
+
+    template <typename AP>
+    Formula<AP> make_release(Formula<AP> const& sub1, Formula<AP> const& sub2) {
+      return Formula<AP>(FormulaForm::Release, sub1, sub2);
+    }
+
+    template <typename AP>
     class Formula {
     public:
       Formula(Formula const&) = default;
@@ -91,22 +91,22 @@ namespace mc {
       Formula& operator=(Formula const&) = default;
       Formula& operator=(Formula&&) = default;
 
-      bool operator==(Formula const& rhs) {
+      bool operator==(Formula const& rhs) const {
         if (this == &rhs) { return true; }
-        return form == rhs.form && children == rhs.children;
+        return formulaForm == rhs.formulaForm && children == rhs.children;
       }
 
-      bool operator!=(Formula const& rhs) {
+      bool operator!=(Formula const& rhs) const {
         return !(*this == rhs);
       }
 
       FormulaForm form() const {
-        return form;
+        return formulaForm;
       }
 
       AP getAP() const {
         if (form() != FormulaForm::Atomic) {
-          throw std::bad_variant_access("Attempt to access AP value of non-atomic formula.");
+          throw std::domain_error("Attempt to access AP value of non-atomic formula.");
         }
         return std::get<AP>(children);
       }
@@ -117,36 +117,42 @@ namespace mc {
 
       std::vector<Formula>& getSubformulas() {
         if (form() == FormulaForm::Atomic) {
-          throw std::bad_variant_access("Attempt to access subformulas of atomic formula.");
+          throw std::domain_error("Attempt to access subformulas of atomic formula.");
         }
         return std::get<std::vector<Formula>>(children);
       }
 
+      std::vector<Formula> const& getSubformulas() const {
+        if (form() == FormulaForm::Atomic) {
+          throw std::domain_error("Attempt to access subformulas of atomic formula.");
+        }
+        return std::get<std::vector<Formula>>(children);
+      }
 
-      friend Formula make_atomic<State, AP>(AP const&);
-      template <typename F, typename S, typename A>
-      friend Formula<F, S> make_atomic(F const&);
+      friend Formula make_atomic<AP>(AP const&);
+      template <typename F, typename A>
+      friend Formula<A> make_atomic(F const&);
 
-      friend Formula make_not<State, AP>(Formula const&);
-      friend Formula make_or<State, AP>(Formula const&, Formula const&);
-      friend Formula make_and<State, AP>(Formula const&, Formula const&);
-      friend Formula make_global<State, AP>(Formula const&);
-      friend Formula make_future<State, AP>(Formula const&);
-      friend Formula make_until<State, AP>(Formula const&, Formula const&);
-      friend Formula make_release<State, AP>(Formula const&, Formula const&);
+      friend Formula make_not<AP>(Formula const&);
+      friend Formula make_or<AP>(Formula const&, Formula const&);
+      friend Formula make_and<AP>(Formula const&, Formula const&);
+      friend Formula make_global<AP>(Formula const&);
+      friend Formula make_future<AP>(Formula const&);
+      friend Formula make_until<AP>(Formula const&, Formula const&);
+      friend Formula make_release<AP>(Formula const&, Formula const&);
     private:
       Formula(AP const& ap)
-        : form(FormulaForm::Atomic),
+        : formulaForm(FormulaForm::Atomic),
           children(ap),
           apSet{ap}
         {}
-      Formula(FormulaForm form, Formula sub)
-        : form(form),
+      Formula(FormulaForm formulaForm, Formula sub)
+        : formulaForm(formulaForm),
           children(std::vector<Formula>{sub}),
           apSet(sub.apSet)
         {}
-      Formula(FormulaForm form, Formula sub1, Formula sub2)
-        : form(form),
+      Formula(FormulaForm formulaForm, Formula sub1, Formula sub2)
+        : formulaForm(formulaForm),
           children(std::vector<Formula>{sub1, sub2}),
           apSet(sub1.apSet)
         {
@@ -157,15 +163,15 @@ namespace mc {
 
       Formula() = delete;
 
-      FormulaForm form;
+      FormulaForm formulaForm;
       std::variant<std::vector<Formula>,AP> children;
       auto_set<AP> apSet;
     };
 
-    template <typename State, typename AP>
-    inline const auto False = make_atomic<State, AP>([](auto const&) { return false; });
-    template <typename State, typename AP>
-    inline const auto True = make_atomic<State, AP>([](auto const&) { return true; });
+    template <typename AP>
+    inline const auto False = make_atomic<AP>([](auto const&) { return false; });
+    template <typename AP>
+    inline const auto True = make_atomic<AP>([](auto const&) { return true; });
   }
 }
 

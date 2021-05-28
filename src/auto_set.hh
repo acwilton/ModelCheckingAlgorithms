@@ -23,8 +23,7 @@ namespace mc {
   public:
     // The conditional check to determine which underlying representation to use
     using set_representation =
-      std::conditional_t<traits::hashable<T>::value, std::unordered_set<T>,
-                       std::conditional_t<traits::comparable<T>::value, std::set<T>, simple_set<T>>>;
+      std::conditional_t<traits::hashable<T>::value, std::unordered_set<T>, simple_set<T>>;
     using iterator = typename set_representation::iterator;
     using const_iterator = typename set_representation::const_iterator;
 
@@ -45,10 +44,10 @@ namespace mc {
       set = init;
     }
 
-    bool operator==(auto_set const& rhs) {
+    bool operator==(auto_set const& rhs) const {
       return set == rhs.set;
     }
-    bool operator!=(auto_set const& rhs) {
+    bool operator!=(auto_set const& rhs) const {
       return set != rhs.set;
     }
 

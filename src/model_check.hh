@@ -12,9 +12,9 @@
 
 namespace mc {
   template <typename State, typename AP>
-  auto ModelCheck(Kripke<State, AP> const& kripke, ltl::Formula<State, AP> const& spec) {
+  auto ModelCheck(Kripke<State, AP> const& kripke, ltl::Formula<AP> const& spec) {
     auto normalizedSpec = ltl::Normalize(spec);
-    auto kripke_buchi = KripkeToBuchi(kripke, normalizedSpec.getAPVec());
+    auto kripke_buchi = KripkeToBuchi(kripke, normalizedSpec.getAPSet());
     auto ltl_buchi = ltl::LTLToBuchi(normalizedSpec);
 
     // This functor determines if the set of APs appearing on a transition in ltl_buchi is a subset of the APs appearing on a transition in kripke_buchi. If so then we should be able to take this transition in the intersection.
@@ -26,7 +26,6 @@ namespace mc {
       }
       return true;
     };
-
     auto intersection = Intersection(kripke_buchi, ltl_buchi, specAPSubsetKripkeAP);
     return FindAcceptingRun(intersection);
   }

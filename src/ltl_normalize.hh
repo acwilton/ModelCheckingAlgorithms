@@ -1,15 +1,15 @@
 #ifndef LTL_NORMALIZE_HH
 #define LTL_NORMALIZE_HH
 
-#include "ltl.hh";
+#include "ltl.hh"
 
 namespace mc {
   namespace ltl {
     // Puts formula into NNF and removes G's and F's using equivalences to R and U
-    template <typename State, typename AP>
-    Formula<State, AP> Normalize(Formula<State, AP> const& formula) {
-      auto True = ltl::True<State, AP>;
-      auto False = ltl::False<State, AP>;
+    template <typename AP>
+    Formula<AP> Normalize(Formula<AP> const& formula) {
+      auto True = ltl::True<AP>;
+      auto False = ltl::False<AP>;
 
       switch(formula.form()) {
       case FormulaForm::Atomic:
@@ -47,12 +47,12 @@ namespace mc {
           return formula;
 
         case FormulaForm::Until:
-          return make_release(Normalize(make_not(sub.getSubformulas[0])),
-                              Normalize(make_not(sub.getSubformulas[1])));
+          return make_release(Normalize(make_not(sub.getSubformulas()[0])),
+                              Normalize(make_not(sub.getSubformulas()[1])));
 
         case FormulaForm::Release:
-          return make_until(Normalize(make_not(sub.getSubformulas[0])),
-                            Normalize(make_not(sub.getSubformulas[1])));
+          return make_until(Normalize(make_not(sub.getSubformulas()[0])),
+                            Normalize(make_not(sub.getSubformulas()[1])));
 
         case FormulaForm::Global:
           // (! (G f)) = (F (! f)) = (U true (! f))
@@ -62,7 +62,7 @@ namespace mc {
           // (! (F f)) = (G (! f)) = (R false (! f))
           return make_release(False, Normalize(make_not(sub.getSubformulas()[0])));
 
-        case FormulaForm::Or:
+        case FormulaForm::And:
           return make_and(Normalize(make_not(sub.getSubformulas()[0])),
                           Normalize(make_not(sub.getSubformulas()[1])));
 

@@ -28,12 +28,12 @@ namespace mc {
     auto buchiStateTransitions = [&kripke,&apSet](BuchiStateType const& s) {
       const auto&[optKripkeState, constraintIndex] = s;
 
-      auto_set<BuchiStateType> nextStates = optKripkeState ?
+      auto_set<State> nextStates = optKripkeState ?
         kripke.getTransitions(*optKripkeState)
         : kripke.getInitialStates();
 
       size_t y = constraintIndex;
-      BuchiType::TransitionSet transitions;
+      typename BuchiType::TransitionSet transitions;
       for (const auto& next : nextStates) {
         if (constraintIndex == kripke.getNumConstraints()) {
           y = 0;

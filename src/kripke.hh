@@ -60,7 +60,7 @@ namespace mc {
           validAPs.emplace_back(ap);
         }
       }
-      return auto_set(validAPs.begin(), validAPs.end());
+      return auto_set<AP>(validAPs.begin(), validAPs.end());
     }
 
     size_t getNumConstraints() const {

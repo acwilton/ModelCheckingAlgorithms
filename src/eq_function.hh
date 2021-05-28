@@ -40,6 +40,10 @@ namespace mc {
       return f(args...);
     }
 
+    R operator()(Args... args) const {
+      return f(args...);
+    }
+
     explicit operator bool() const {
       return static_cast<bool>(f);
     }

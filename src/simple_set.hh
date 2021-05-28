@@ -32,10 +32,10 @@ namespace mc {
       set = init;
     }
 
-    bool operator==(simple_set const& rhs) {
+    bool operator==(simple_set const& rhs) const {
       return set == rhs.set;
     }
-    bool operator!=(simple_set const& rhs) {
+    bool operator!=(simple_set const& rhs) const {
       return set != rhs.set;
     }
 

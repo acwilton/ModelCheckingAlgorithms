@@ -39,10 +39,10 @@ namespace mc {
       map = init;
     }
 
-    bool operator==(simple_map const& rhs) {
+    bool operator==(simple_map const& rhs) const {
       return map == rhs.map;
     }
-    bool operator!=(simple_map const& rhs) {
+    bool operator!=(simple_map const& rhs) const {
       return map != rhs.map;
     }
 

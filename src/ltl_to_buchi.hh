@@ -13,21 +13,47 @@
 namespace mc {
   namespace ltl {
     namespace _details_ {
-      template <typename State, typename AP>
+      template <typename AP>
       struct LTLNode {
-        static int count = 0;
-        int id;
+        inline static int count = 0;
 
-        auto_set<Formula<State, AP>> new;
-        auto_set<Formula<State, AP>> now;
-        auto_set<Formula<State, AP>> next;
+        LTLNode() = default;
+        LTLNode(LTLNode const&) = default;
+        LTLNode(LTLNode&&) = default;
+        LTLNode(int id,
+                auto_set<Formula<AP>> const& newSet,
+                auto_set<Formula<AP>> const& nowSet,
+                auto_set<Formula<AP>> const& nextSet)
+          : id(id),
+            newSet(newSet),
+            nowSet(nowSet),
+            nextSet(nextSet)
+          {}
+
+        LTLNode& operator=(LTLNode const&) = default;
+        LTLNode& operator=(LTLNode&&) = default;
+
+        bool operator==(LTLNode const& rhs) const {
+          return id == rhs.id
+            && newSet == rhs.newSet
+            && nowSet == rhs.nowSet
+            && nextSet == rhs.nextSet;
+        }
+        bool operator!=(LTLNode const& rhs) const {
+          return !(*this == rhs);
+        }
+
+        int id;
+        auto_set<Formula<AP>> newSet;
+        auto_set<Formula<AP>> nowSet;
+        auto_set<Formula<AP>> nextSet;
       };
 
-      template <typename State, AP>
-      LTLNode freshNode(auto_set<Formula<State, AP>> new,
-                        auto_set<Formula<State, AP>> now,
-                        auto_set<Formula<State, AP>> next) {
-        return LTLNode{++LTLNode::count, new, now, next};
+      template <typename AP>
+      LTLNode<AP> freshNode(auto_set<Formula<AP>> const& newSet,
+                            auto_set<Formula<AP>> const& nowSet,
+                            auto_set<Formula<AP>> const& nextSet) {
+        return LTLNode<AP>(++LTLNode<AP>::count, newSet, nowSet, nextSet);
       }
 
       struct NodeRelations {
@@ -43,14 +69,14 @@ namespace mc {
         std::unordered_map<int, std::unordered_set<int>> outgoing;
       };
 
-      template <typename State, typename AP>
-      void UpdateClosed(std::unordered_map<int, LTLNode<State, AP>>& open,
-                        std::unordered_map<int, LTLNode<State, AP>>& closed,
+      template <typename AP>
+      void UpdateClosed(std::unordered_map<int, LTLNode<AP>>& open,
+                        std::unordered_map<int, LTLNode<AP>>& closed,
                         NodeRelations& nodeRelations,
-                        LTLNode<State, AP>& q) {
+                        LTLNode<AP> const& q) {
         bool foundMatch = false;
-        for (auto& c : closed) {
-          if (c.now == q.now && c.next == q.next) {
+        for (auto& [_,c] : closed) {
+          if (c.nowSet == q.nowSet && c.nextSet == q.nextSet) {
             foundMatch = true;
             auto qIncoming = nodeRelations.incoming[q.id];
             // Moving transitions a -> q to q -> c
@@ -61,60 +87,65 @@ namespace mc {
           }
         }
         if (!foundMatch) {
-          closed[q.id] = q;
-          auto nextNode = freshNode(q.next, {}, {});
+          closed.insert(std::make_pair(q.id,q));
+          auto nextNode = freshNode(q.nextSet, {}, {});
           nodeRelations.add_relation(q.id, nextNode.id);
           open[nextNode.id] = nextNode;
         }
       }
 
-      template <typename State, AP>
-      void UpdateSplit(std::unordered_map<int, LTLNode<State, AP>>& open,
+      template <typename AP>
+      void UpdateSplit(std::unordered_map<int, LTLNode<AP>>& open,
                        NodeRelations& nodeRelations,
-                       auto_set<Formula<State,AP>>>& untilSet,
-                       LTLNode<State, AP>& q,
-                       Formula<State, AP>& psi) {
+                       auto_set<Formula<AP>>& untilSet,
+                       LTLNode<AP> & q,
+                       Formula<AP> const& psi) {
         auto Split = [&nodeRelations,&q]() {
-          LTLNode<State,AP> splitQ = freshNode(q.new,q.now,q.next);
-          for (int fromId : nodeRelations.incoming.at(q.id)) {
+          LTLNode<AP> splitQ = freshNode(q.newSet,q.nowSet,q.nextSet);
+          for (int fromId : nodeRelations.incoming.at(q.id)) {//HERE
             nodeRelations.add_relation(fromId, splitQ.id);
           }
-          return open.at(splitQ.id);
-        }
+          return splitQ;
+        };
 
         switch(psi.form()) {
-        case FormulaForm::Atomic:
+        case FormulaForm::Atomic: {
           break;
+        }
 
-        case FormulaForm::Or:
-          LTLNode<State, AP> splitQ = Split();
-          q.new.insert(psi.getSubformulas()[0]);
-          splitQ.new.insert(psi.getSubformulas()[1]);
+        case FormulaForm::Or: {
+          LTLNode<AP> splitQ = Split();
+          q.newSet.insert(psi.getSubformulas()[0]);
+          splitQ.newSet.insert(psi.getSubformulas()[1]);
           open[splitQ.id] = splitQ;
           break;
+        }
 
-        case FormulaForm::And:
-          q.new.insert(psi.getSubformulas()[0]);
-          q.new.insert(psi.getSubformulas()[1]);
+        case FormulaForm::And: {
+          q.newSet.insert(psi.getSubformulas()[0]);
+          q.newSet.insert(psi.getSubformulas()[1]);
           break;
+        }
 
-        case FormulaForm::Until:
+        case FormulaForm::Until: {
           untilSet.insert(psi);
-          LTLNode<State, AP> splitQ = Split();
-          q.new.insert(psi.getSubformulas()[1]);
-          splitQ.new.insert(psi.getSubformulas()[0]);
-          splitQ.next.insert(psi);
+          LTLNode<AP> splitQ = Split();
+          q.newSet.insert(psi.getSubformulas()[1]);
+          splitQ.newSet.insert(psi.getSubformulas()[0]);
+          splitQ.nextSet.insert(psi);
           open[splitQ.id] = splitQ;
           break;
+        }
 
-        case FormulaForm::Release:
-          LTLNode<State, AP> splitQ = Split();
-          q.new.insert(psi.getSubformulas()[0]);
-          q.new.insert(psi.getSubformulas()[1]);
-          splitQ.new.insert(psi.getSubformulas()[1]);
-          splitQ.next.insert(psi);
+        case FormulaForm::Release: {
+          LTLNode<AP> splitQ = Split();
+          q.newSet.insert(psi.getSubformulas()[0]);
+          q.newSet.insert(psi.getSubformulas()[1]);
+          splitQ.newSet.insert(psi.getSubformulas()[1]);
+          splitQ.nextSet.insert(psi);
           open[splitQ.id] = splitQ;
           break;
+        }
 
         default:
           std::string formString = (psi.form() == FormulaForm::Not) ? "Not"
@@ -125,46 +156,46 @@ namespace mc {
 
     }
 
-    template <typename State, typename AP>
-    auto LTLToBuchi(Formula<State, AP> const& formula) {
-      using Formula = Formula<State, AP>;
-      using Kripke = Kripke<LTLNode<State,AP>, AP>;
-      using LTLNode = _details_::LTLNode<State,AP>;
+    template <typename AP>
+    auto LTLToBuchi(Formula<AP> const& formula) {
+      using Formula = Formula<AP>;
+      using LTLNode = _details_::LTLNode<AP>;
+      using Kripke = Kripke<LTLNode, AP>;
 
-      auto_set<Formula<State,AP>> untilSet(); // Used for generating the fairness characteristic functions
+      auto_set<Formula> untilSet{}; // Used for generating the fairness characteristic functions
 
-      std::unordered_map<int, LTLNode> closed();
-      std::unordered_map<int, LTLNode> open();
-      _details_::NodeRelations nodeRelations();
+      std::unordered_map<int, LTLNode> closed{};
+      std::unordered_map<int, LTLNode> open{};
+      _details_::NodeRelations nodeRelations{};
 
-      auto firstNode = _details_::freshNode({formula}, {}{});
+      auto firstNode = _details_::freshNode<AP>({formula}, {}, {});
       open[firstNode.id] = firstNode;
-      nodeRelations.add_relation(-1, LTLNode::count);
+      nodeRelations.add_relation(-1, firstNode.id);
 
       while (!open.empty()) {
-        LTLNode& q = *(open.end() - 1);
-        if (q.new.empty()) {
-          open.erase(open.end() - 1);
+        LTLNode& q = open.begin()->second;
+        if (q.newSet.empty()) {
+          open.erase(open.begin());
           _details_::UpdateClosed(open, closed, nodeRelations, q);
         } else {
-          auto [psiIter,_] = q.now.insert(std::move(*(q.new.end() - 1)));
-          q.new.erase(q.new.end() - 1);
-          _details_::UpdateSplit(open, nodeRelations, q, *psiIter);
+          auto [psiIter,_] = q.nowSet.insert(std::move(*(q.newSet.begin())));
+          q.newSet.erase(q.newSet.begin());
+          _details_::UpdateSplit(open, nodeRelations, untilSet, q, *psiIter);
         }
       }
 
       // The set of initial states are precisely the nodes in closed that contain -1 in their incomingNodes set.
       auto_set<LTLNode> initStates;
-      for (auto& startId : nodeRelations.incoming.at(-1)) {
-        initStates.insert(closed.at(startId));
+      for (auto& startId : nodeRelations.outgoing.at(-1)) { //HERE
+        initStates.insert(closed.at(startId)); //HERE
       }
 
-      std::vector<Kripke::StateCharFunc> fairnessConstraints;
+      std::vector<typename Kripke::StateCharFunc> fairnessConstraints;
       for (auto& formula : untilSet) {
         fairnessConstraints.emplace_back([&formula](LTLNode const& q) {
           // formula is of the form (U a b). q satisfies the constraint if either q satisfies b or does not satisfy (U a b).
-          return (q.now.count(formula.getSubformulas()[1]) == 1) || (q.now.count(formula) == 0);
-        }));
+          return (q.nowSet.count(formula.getSubformulas()[1]) == 1) || (q.nowSet.count(formula) == 0);
+        });
       }
 
       return KripkeToBuchi(
@@ -172,14 +203,14 @@ namespace mc {
           initStates,
           [&closed,&nodeRelations](LTLNode const& node) {
             auto_set<LTLNode> nextSet;
-            for (auto nextId : nodeRelations.outgoing.at(node.id)) {
-              nextSet.insert(closed.at(nextId));
+            for (auto nextId : nodeRelations.outgoing.at(node.id)) { //HERE
+              nextSet.insert(closed.at(nextId));//HERE
             }
             return nextSet;
           },
           fairnessConstraints,
           [](LTLNode const& node, AP const& ap) {
-            for (auto& sub : node.now) {
+            for (auto& sub : node.nowSet) {
               if (sub.form() == FormulaForm::Atomic && sub.getAP() == ap) return true;
             }
             return false;
