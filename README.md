@@ -11,7 +11,7 @@ Algorithms implemented:
 
 Currently there are some runtime issues with the model checking algorithm but the subset of the library which involves taking the intersection of two Buchi's and find an accepting run is working. I wrote a driver that can be ran that will parse a file that specifies two buchi automata and will then take their intersection and try to find an accepting run. If one is found, it will print the lasso it forms.
 
-To build the driver simply type `make` under the `src/` folder. A file called `driver` will be generated which can be run with a filename as input like so: `./driver test1.buchi`. The filename should be of a file that holds the specification of two Buchi automaton. 
+To build the driver simply type `make` under the `src/` folder. A file called `driver` will be generated which can be run with a filename as input like so: `./driver example.buchi`. The filename should be of a file that holds the specification of two Buchi automaton. 
 
 The specification of a Buchi automaton looks as follows:
 ```
@@ -32,4 +32,4 @@ A triple `(ai, li, bi)` represents a labeled transition from node `ai` to node `
 
 For the driver to accept a buchi specification file, it must have exactly two buchi structures as written above (whitespacing differences are ignored).
 
-To help get started playing with this tool, there is an example file you can run the driver on called `test1.buchi`.
+To help get started playing with this tool, there is an example file you can run the driver on called `example.buchi`.
