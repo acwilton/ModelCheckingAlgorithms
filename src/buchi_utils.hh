@@ -54,7 +54,8 @@ namespace mc {
         }
       }
       if (buchi.accepting(q)) {
-        std::vector<S> stack2 {q};
+        std::vector<S> stack2{};
+        stack2.emplace_back(q);
         return dfs2(buchi, q, stack, stack2, flagged);
       }
       return std::nullopt;
@@ -68,7 +69,8 @@ namespace mc {
     auto_set<S> hashed;
     auto_set<S> flagged;
     for (auto& initState : buchi.getInitialStates()) {
-      std::vector<S> stack {initState};
+      std::vector<S> stack {};
+      stack.emplace_back(initState);
       auto result = _details_::dfs1(buchi, initState, stack, hashed, flagged);
       if (result) {
         return result;
