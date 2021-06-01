@@ -24,7 +24,7 @@ namespace mc {
         for(; iter != stack1.end(); ++iter) {
           if (*iter == next) {
             std::vector<S> loop (iter, stack1.end());
-            loop.insert(loop.end(), stack2.begin(), stack2.end()-1);
+            loop.insert(loop.end(), stack2.begin()+1, stack2.end());
             return std::make_optional(std::make_pair(std::vector<S>(stack1.begin(), iter), loop));
           }
         }
