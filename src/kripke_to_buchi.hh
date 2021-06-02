@@ -32,9 +32,9 @@ namespace mc {
         kripke.getTransitions(*optKripkeState)
         : kripke.getInitialStates();
 
-      size_t y = constraintIndex;
       typename BuchiType::TransitionSet transitions;
       for (const auto& next : nextStates) {
+        size_t y = constraintIndex;
         if (constraintIndex == kripke.getNumConstraints()) {
           y = 0;
         } else if (kripke.checkConstraint(constraintIndex, next)) {
