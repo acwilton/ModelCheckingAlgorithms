@@ -99,7 +99,7 @@ namespace mc {
     };
 
     // Definition of state transition function
-    auto interStateTransitions = [&b1,&b2,&labelMatch](InterStateType const& s) {
+    auto interStateTransitions = [b1,b2,labelMatch](InterStateType const& s) {
       typename BuchiType::TransitionSet transitions;
       int x = std::get<2>(s);
 

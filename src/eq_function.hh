@@ -2,6 +2,7 @@
 #define EQ_FUNCTION_HH
 
 #include <functional>
+#include <ostream>
 
 namespace mc {
   // Class is undefined if its type is not a function signature
@@ -47,12 +48,21 @@ namespace mc {
     explicit operator bool() const {
       return static_cast<bool>(f);
     }
+
+    template <typename F>
+    friend std::ostream& operator<<(std::ostream& stream, EqFunction<F> const& func);
   private:
     inline static int count = 0;
 
     int id;
     std::function<R(Args...)> f;
   };
+
+  template <typename T>
+  std::ostream& operator<<(std::ostream& stream, EqFunction<T> const& func) {
+    stream << func.id;
+    return stream;
+  }
 }
 
 #endif

@@ -3,6 +3,8 @@
 
 #include <variant>
 #include <utility>
+#include <ostream>
+#include <sstream>
 
 #include "auto_set.hh"
 #include "eq_function.hh"
@@ -172,6 +174,48 @@ namespace mc {
     inline const auto False = make_atomic<AP>([](auto const&) { return false; });
     template <typename AP>
     inline const auto True = make_atomic<AP>([](auto const&) { return true; });
+
+    template <typename T>
+    std::ostream& operator<< (std::ostream& stream, Formula<T> const& formula) {
+      std::stringstream formStringStream;
+      formStringStream << "(";
+      switch(formula.form()) {
+      case FormulaForm::Atomic:
+        formStringStream << formula.getAP();
+        break;
+
+      case FormulaForm::Until:
+        formStringStream << "U " << formula.getSubformulas()[0] << " " << formula.getSubformulas()[1];
+        break;
+
+      case FormulaForm::Release:
+        formStringStream << "R " << formula.getSubformulas()[0] << " " << formula.getSubformulas()[1];
+        break;
+
+      case FormulaForm::Global:
+        formStringStream << "G " << formula.getSubformulas()[0];
+        break;
+
+      case FormulaForm::Future:
+        formStringStream << "F " << formula.getSubformulas()[0];
+        break;
+
+      case FormulaForm::Or:
+        formStringStream << "|| " << formula.getSubformulas()[0] << " " << formula.getSubformulas()[1];
+        break;
+
+      case FormulaForm::And:
+        formStringStream << "&& " << formula.getSubformulas()[0] << " " << formula.getSubformulas()[1];
+        break;
+
+      case FormulaForm::Not:
+        formStringStream << "! " << formula.getSubformulas()[0];
+        break;
+      }
+      formStringStream << ")";
+      stream << formStringStream.str();
+      return stream;
+    }
   }
 }
 

@@ -25,7 +25,7 @@ namespace mc {
     };
 
     // Definition of state transition function
-    auto buchiStateTransitions = [&kripke,&apSet](BuchiStateType const& s) {
+    auto buchiStateTransitions = [kripke,apSet](BuchiStateType const& s) {
       const auto&[optKripkeState, constraintIndex] = s;
 
       auto_set<State> nextStates = optKripkeState ?

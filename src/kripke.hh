@@ -17,9 +17,7 @@ namespace mc {
 
     Kripke(StateSet initialStates,
            StateTransitions stateTransitions,
-           std::vector<StateCharFunc> fairnessConstraints = { [](State const&) {
-             return true;
-           } },
+           std::vector<StateCharFunc> fairnessConstraints = {},
            LabelingFunc labelingFunction = [](State const& s, AP const& ap) {
              return ap(s);
            })
