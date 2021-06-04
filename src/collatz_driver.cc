@@ -40,14 +40,14 @@ public:
       comparison = ComparisonType::EQUALS;
     } else if (match_token(NOT_EQUALS)) {
       comparison = ComparisonType::NOT_EQUALS;
-    } else if (match_token(LESSER)) {
-      comparison = ComparisonType::LESSER;
     } else if (match_token(LESS_EQ)) {
       comparison = ComparisonType::LESS_EQ;
-    } else if (match_token(GREATER)) {
-      comparison = ComparisonType::GREATER;
+    } else if (match_token(LESSER)) {
+      comparison = ComparisonType::LESSER;
     } else if (match_token(GREAT_EQ)) {
       comparison = ComparisonType::GREAT_EQ;
+    } else if (match_token(GREATER)) {
+      comparison = ComparisonType::GREATER;
     } else {
       reportError("Expected one of ==, !=, <, <=, >, or >= at start of atomic proposition.");
       return std::nullopt;
