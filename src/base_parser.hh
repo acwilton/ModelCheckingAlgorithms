@@ -20,17 +20,16 @@ public:
         std::cout << "Parser constructed with a bad stream.\n";
       }
     }
-  ~Parser() {}
-  
-protected:
-  bool match_token(std::string tokenPattern) {
+  virtual ~Parser() {}
+
+  virtual bool match_token(std::string tokenPattern) {
     std::string result;
     return match_token(result, tokenPattern);
   }
 
-  bool match_token(std::string& result, std::string tokenPattern) {
+  virtual bool match_token(std::string& result, std::string tokenPattern) {
     eat_whitespace();
-    std::regex tokenPatternAtStart ("^"+tokenPattern);
+    std::regex tokenPatternAtStart ("^("+tokenPattern+")");
     std::smatch match;
     if (std::regex_search(currentLine, match, tokenPatternAtStart)) {
       result = match[0].str();
@@ -40,7 +39,7 @@ protected:
     return false;
   }
 
-  void eat_whitespace() {
+  virtual void eat_whitespace() {
     std::regex whitespacePattern(R"(^\s+)");
     std::smatch whitespaceMatch;
 
@@ -52,7 +51,7 @@ protected:
     }
   }
 
-  bool eat_characters(int numChars) {
+  virtual bool eat_characters(int numChars) {
     while ((currentLine == "" || numChars > 0) && stream) {
       if (numChars < currentLine.size()) {
         currentLine = currentLine.substr(numChars);
@@ -67,7 +66,7 @@ protected:
     return numChars == 0;
   }
 
-  void reportError(std::string errorMsg) {
+  virtual void reportError(std::string errorMsg) {
     errorsOccurred = true;
     std::cout << "Line " << currentLineNum << ": " << errorMsg << "\n";
     if (stream.eof()) {
@@ -77,6 +76,25 @@ protected:
     }
   }
 
+  virtual void transferStream(Parser* parser) {
+    if (parser != nullptr) {
+      int streamOffset = -static_cast<int>(currentLine.size());
+      stream.unget();
+      char p = stream.get();
+      if (p == '\n') {
+        --streamOffset; // Must decrease offset by one because currentLine doesn't include the \n that exists in the stream
+      }
+      stream.seekg(streamOffset, std::ios_base::cur);
+      currentLine = "";
+      parser->currentLineNum = currentLineNum;
+    }
+  }
+
+  virtual std::string getCurrentLine() const {
+    return currentLine;
+  }
+
+protected:
   std::istream& stream;
   bool errorsOccurred;
   int currentLineNum;

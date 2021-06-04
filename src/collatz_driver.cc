@@ -52,7 +52,7 @@ public:
       reportError("Expected one of ==, !=, <, <=, >, or >= at start of atomic proposition.");
       return std::nullopt;
     }
-    
+
     bool leftIsInput = false;
     int leftInt;
     if (auto opt_leftInt = match_number(); opt_leftInt) {
@@ -93,7 +93,7 @@ public:
             case ComparisonType::GREATER:
               return left > right;
             case ComparisonType::GREAT_EQ:
-              return left == right;
+              return left >= right;
             }
           }));
     }
@@ -102,13 +102,13 @@ public:
       
 private:
   static constexpr auto EQUALS = R"(==)";
-  static constexpr auto NOT_EQUALS = R"(!=)";
+  static constexpr auto NOT_EQUALS = R"(=/=)";
   static constexpr auto LESSER = R"(<)";
   static constexpr auto GREATER = R"(>)";
   static constexpr auto LESS_EQ = R"(<=)";
   static constexpr auto GREAT_EQ = R"(>=)";
 
-  static constexpr auto NUM = R"(-?[1-9][0-9]*)";
+  static constexpr auto NUM = R"(-?[1-9][0-9]*|0)";
   static constexpr auto VAR = R"(x)";
 
   std::optional<int> match_number() {
@@ -157,9 +157,9 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  LTLParser<AP> ltlParser (stream, [](std::istream& stream) {
-    CollatzAPParser apParser (stream);
-    return apParser.Parse();
+  auto apParserPtr = std::make_shared<CollatzAPParser>(stream);
+  LTLParser<AP> ltlParser (stream, apParserPtr, [](std::shared_ptr<Parser> p) {
+    return std::dynamic_pointer_cast<CollatzAPParser>(p)->Parse();
   });
 
   std::optional<ltl::Formula<AP>> opt_spec;

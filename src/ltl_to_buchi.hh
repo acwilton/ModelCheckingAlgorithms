@@ -50,20 +50,6 @@ namespace mc {
 
       template <typename T>
       std::ostream& operator<<(std::ostream& stream, LTLNode<T> const& ltlNode) {
-        /*stream << "id: " << ltlNode.id << " {\n  new: {\n";
-        for (auto formula : ltlNode.newSet) {
-          stream << "    " << formula << "\n";
-        }
-        stream << "  }\n  now: {\n";
-        for (auto formula : ltlNode.nowSet) {
-          stream << "    " << formula << "\n";
-        }
-        stream << "  }\n  next: {\n";
-        for (auto formula : ltlNode.nextSet) {
-          stream << "    " << formula << "\n";
-        }
-        stream << "  }\n}";
-        */
         stream << ltlNode.id << "{ ";
         for (auto formula : ltlNode.nowSet) {
           stream << formula << " | ";
@@ -100,7 +86,6 @@ namespace mc {
         bool foundMatch = false;
         for (auto& [_,c] : closed) {
           if (c.nowSet == q.nowSet && c.nextSet == q.nextSet) {
-            //std::cout << "Found match against:\n" << c << "\n";
             foundMatch = true;
             auto qIncoming = nodeRelations.incoming[q.id];
             // Moving transitions a -> q to q -> c
@@ -111,13 +96,9 @@ namespace mc {
           }
         }
         if (!foundMatch) {
-          //std::cout << "No match! Adding to closed:\n" << q << "\n";
-          //closed.insert(std::make_pair(q.id,q));
           closed[q.id] = q;
           auto nextNode = freshNode(q.nextSet, {}, {});
-          //std::cout << "Next node:\n" << nextNode << "\n";
           nodeRelations.add_relation(q.id, nextNode.id);
-          //open.insert(std::make_pair(nextNode.id,nextNode));
           open[nextNode.id] = nextNode;
         }
       }
@@ -145,7 +126,6 @@ namespace mc {
           LTLNode<AP> splitQ = Split();
           q.newSet.insert(psi.getSubformulas()[0]);
           splitQ.newSet.insert(psi.getSubformulas()[1]);
-          //open.insert(std::make_pair(splitQ.id, splitQ));
           open[splitQ.id] = splitQ;
           break;
         }
@@ -162,7 +142,6 @@ namespace mc {
           q.newSet.insert(psi.getSubformulas()[1]);
           splitQ.newSet.insert(psi.getSubformulas()[0]);
           splitQ.nextSet.insert(psi);
-          //open.insert(std::make_pair(splitQ.id, splitQ));
           open[splitQ.id] = splitQ;
           break;
         }
@@ -173,7 +152,6 @@ namespace mc {
           q.newSet.insert(psi.getSubformulas()[1]);
           splitQ.newSet.insert(psi.getSubformulas()[1]);
           splitQ.nextSet.insert(psi);
-          //open.insert(std::make_pair(splitQ.id, splitQ));
           open[splitQ.id] = splitQ;
           break;
         }
@@ -200,73 +178,45 @@ namespace mc {
       _details_::NodeRelations nodeRelations{};
 
       auto firstNode = _details_::freshNode<AP>({formula}, {}, {});
-      //open.insert(std::make_pair(firstNode.id, firstNode));
       open[firstNode.id] = firstNode;
       nodeRelations.add_relation(-1, firstNode.id);
 
       while (!open.empty()) {
         LTLNode& q = open.begin()->second;
-        //std::cout << "Processing node:\n" << q << "\n";
         if (q.newSet.empty()) {
-          //std::cout << "New set empty. Closing\n";
           LTLNode qCopy = q;
           open.erase(open.begin());
           _details_::UpdateClosed(open, closed, nodeRelations, qCopy);
         } else {
           auto [psiIter,_] = q.nowSet.insert(std::move(*(q.newSet.begin())));
           q.newSet.erase(q.newSet.begin());
-          //std::cout << "New set not empty. Processing subformula: " << *psiIter << "\n";
-          //std::cout << "q after moving subformula:\n" << q << "\n";
           _details_::UpdateSplit(open, nodeRelations, untilSet, q, *psiIter);
         }
-        //std::cout << "\n";
       }
 
       // The set of initial states are precisely the nodes in closed that contain -1 in their incomingNodes set.
-      std::cout << "LTLToBuchi Starting Formula: " << formula << "\n";
       auto_set<LTLNode> initStates;
-      std::cout << "LTL Init states:\n";
       for (auto& startId : nodeRelations.outgoing.at(-1)) {
-        std::cout << closed.at(startId) << "\n";
         LTLNode copy = closed.at(startId);
         initStates.insert(copy);
       }
 
       std::vector<typename Kripke::StateCharFunc> fairnessConstraints;
       for (auto& formula : untilSet) {
-        std::cout << "Until constraint:\n" << formula << "\n";
         fairnessConstraints.emplace_back([formula](LTLNode const& q) {
           // formula is of the form (U a b). q satisfies the constraint if either q satisfies b or does not satisfy (U a b).
-          //std::cout << "Fairness test:\n" << q << "\n";
-          //std::cout << std::boolalpha << "First condition passed? " << (q.nowSet.count(formula.getSubformulas()[1]) == 1) << "\n";
-          //std::cout << std::boolalpha << "Second condition passed? " << (q.nowSet.count(formula) == 0) << "\n";
           return (q.nowSet.count(formula.getSubformulas()[1]) == 1) || (q.nowSet.count(formula) == 0);
         });
-      }
-
-      std::cout << "Closed set:\n";
-      for (auto [_,node] : closed) {
-        std::cout << node << "\n";
-      }
-
-      std::cout << "Relations:\n";
-      for (auto [from_id, toSet] : nodeRelations.outgoing) {
-        for (auto to_id : toSet) {
-          std::cout << from_id << " -> " << to_id << "\n";
-        }
       }
 
       return KripkeToBuchi(
         Kripke(
           initStates,
           [closed,nodeRelations](LTLNode const& node) {
-            //std::cout << "Transitioning From:\n" << node << "\n" << "To:\n";
             auto_set<LTLNode> nextSet;
             for (auto nextId : nodeRelations.outgoing.at(node.id)) {
-              //std::cout << closed.at(nextId) << "\n";
               nextSet.insert(closed.at(nextId));
             }
-            //std::cout << "End transition list.\n";
             return nextSet;
           },
           fairnessConstraints,

@@ -6,6 +6,7 @@
 #include <functional>
 #include <utility>
 #include <optional>
+#include <memory>
 
 #include "base_parser.hh"
 #include "ltl.hh"
@@ -13,11 +14,12 @@
 template <typename AP>
 class LTLParser final : public Parser{
 public:
-  using APParser = std::function<std::optional<mc::ltl::Formula<AP>>(std::istream&)>;
+  using ParserInterface = std::function<std::optional<mc::ltl::Formula<AP>>(std::shared_ptr<Parser>)>;
 
-  LTLParser(std::istream& stream, APParser apParser)
+  LTLParser(std::istream& stream, std::shared_ptr<Parser> apParser, ParserInterface parserInterface)
     : Parser(stream),
-      apParser(apParser)
+      apParser(apParser),
+      parserInterface(parserInterface)
     {}
   ~LTLParser() = default;
 
@@ -39,17 +41,17 @@ private:
   static constexpr auto LPAREN = R"(\()";
   static constexpr auto RPAREN = R"(\))";
     
-  static constexpr auto EQUALS = R"(==)";
-  static constexpr auto NOT_EQUALS = R"(!=)";
+  static constexpr auto EQUALS = R"(\=\=)";
+  static constexpr auto NOT_EQUALS = R"(\!\=)";
   static constexpr auto LESSER = R"(<)";
   static constexpr auto GREATER = R"(>)";
-  static constexpr auto LESS_EQ = R"(<=)";
-  static constexpr auto GREAT_EQ = R"(>=)";
+  static constexpr auto LESS_EQ = R"(<\=)";
+  static constexpr auto GREAT_EQ = R"(>\=)";
 
   static constexpr auto NUM = R"(-?[1-9][0-9]*)";
 
   static constexpr auto AND = R"(&&)";
-  static constexpr auto OR = R"(||)";
+  static constexpr auto OR = R"(\|\|)";
   static constexpr auto NOT = R"(!)";
   static constexpr auto UNTIL = "U";
   static constexpr auto RELEASE = "R";
@@ -97,11 +99,13 @@ private:
     } else if (match_token(NOT)) {
       opt_formula = parse1AryFormula(mc::ltl::make_not<AP>, NOT);
     } else if (match_token(OR)) {
-      opt_formula = parse2AryFormula(mc::ltl::make_or<AP>, OR);
+      opt_formula = parse2AryFormula(mc::ltl::make_or<AP>, "||");
     } else if (match_token(AND)) {
       opt_formula = parse2AryFormula(mc::ltl::make_and<AP>, AND);
     } else {
-      opt_formula = apParser(stream);
+      transferStream(apParser.get());
+      opt_formula = parserInterface(apParser);
+      apParser->transferStream(this);
     }
 
     if (!match_token(RPAREN)) {
@@ -112,7 +116,8 @@ private:
     return opt_formula;
   }
 
-  APParser apParser;
+  std::shared_ptr<Parser> apParser;
+  ParserInterface parserInterface;
 };
 
 #endif
