@@ -1,9 +1,14 @@
 CC=g++
 CFLAGS=-std=c++17
-EXEC=driver
+EXEC=buchi_driver collatz_driver
 
-build: driver.cc
-	$(CC) $(CFLAGS) $^ -o $(EXEC)
+all: buchi_driver collatz_driver
+
+buchi_driver: buchi_driver.cc
+	$(CC) $(CFLAGS) $^ -o $@
+
+collatz_driver: collatz_driver.cc
+	$(CC) $(CFLAGS) $^ -o $@
 
 clean:
 	rm *.o $(EXEC)
