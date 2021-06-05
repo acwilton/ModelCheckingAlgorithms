@@ -20,87 +20,73 @@ using AP = EqFunction<bool(int const&)>;
 class CollatzAPParser final : public Parser{
 public:
 
-  CollatzAPParser(std::istream& stream)
-    : Parser(stream)
+  using ExprType = std::function<int(int)>;
+
+  CollatzAPParser(std::istream& stream, int N)
+    : Parser(stream),
+      N(N)
     {}
   ~CollatzAPParser() = default;
 
-  std::optional<ltl::Formula<AP>> Parse() {
-    enum class ComparisonType {
-      EQUALS,
-      NOT_EQUALS,
-      LESSER,
-      LESS_EQ,
-      GREATER,
-      GREAT_EQ
-    };
-
-    ComparisonType comparison;
+  std::optional<ltl::Formula<AP>> parse() {
     if (match_token(EQUALS)) {
-      comparison = ComparisonType::EQUALS;
+      auto opt_operands = match_operands("==");
+      return !opt_operands
+        ? std::nullopt
+        : std::make_optional(ltl::make_atomic<AP>([opt_operands](int x) {
+          auto& [l,r] = *opt_operands;
+          return l(x) == r(x);
+        }));
     } else if (match_token(NOT_EQUALS)) {
-      comparison = ComparisonType::NOT_EQUALS;
+      auto opt_operands = match_operands("!=");
+      return !opt_operands
+        ? std::nullopt
+        : std::make_optional(ltl::make_atomic<AP>([opt_operands](int x) {
+          auto& [l,r] = *opt_operands;
+          return l(x) != r(x);
+        }));
     } else if (match_token(LESS_EQ)) {
-      comparison = ComparisonType::LESS_EQ;
+      auto opt_operands = match_operands("<=");
+      return !opt_operands
+        ? std::nullopt
+        : std::make_optional(ltl::make_atomic<AP>([opt_operands](int x) {
+          auto& [l,r] = *opt_operands;
+          return l(x) <= r(x);
+        }));
     } else if (match_token(LESSER)) {
-      comparison = ComparisonType::LESSER;
+      auto opt_operands = match_operands("<");
+      return !opt_operands
+        ? std::nullopt
+        : std::make_optional(ltl::make_atomic<AP>([opt_operands](int x) {
+          auto& [l,r] = *opt_operands;
+          return l(x) < r(x);
+        }));
     } else if (match_token(GREAT_EQ)) {
-      comparison = ComparisonType::GREAT_EQ;
+      auto opt_operands = match_operands(">=");
+      return !opt_operands
+        ? std::nullopt
+        : std::make_optional(ltl::make_atomic<AP>([opt_operands](int x) {
+          auto& [l,r] = *opt_operands;
+          return l(x) >= r(x);
+        }));
     } else if (match_token(GREATER)) {
-      comparison = ComparisonType::GREATER;
+      auto opt_operands = match_operands(">");
+      return !opt_operands
+        ? std::nullopt
+        : std::make_optional(ltl::make_atomic<AP>([opt_operands](int x) {
+          auto& [l,r] = *opt_operands;
+          return l(x) > r(x);
+        }));
     } else {
       reportError("Expected one of ==, !=, <, <=, >, or >= at start of atomic proposition.");
       return std::nullopt;
     }
-
-    bool leftIsInput = false;
-    int leftInt;
-    if (auto opt_leftInt = match_number(); opt_leftInt) {
-      leftInt = *opt_leftInt;
-    } else if (match_token(VAR)) {
-      leftIsInput = true;
-    } else {
-      reportError("Unrecognized value at left-hand side of conditional. Expect a number or \"x\".");
-      return std::nullopt;
-    }
-
-    bool rightIsInput = false;
-    int rightInt;
-    if (auto opt_rightInt = match_number(); opt_rightInt) {
-      rightInt = *opt_rightInt;
-    } else if (match_token(VAR)) {
-      rightIsInput = true;
-    } else {
-      reportError("Unrecognized value at right-hand side of conditional. Expect a number or \"x\".");
-      return std::nullopt;
-    }
-
-    if (!errorsOccurred) {
-      return std::make_optional(
-        ltl::make_atomic<AP>(
-          [comparison,leftIsInput,leftInt,rightIsInput,rightInt](int x) {
-            int left = leftIsInput ? x : leftInt;
-            int right = rightIsInput ? x : rightInt;
-            switch(comparison) {
-            case ComparisonType::EQUALS:
-              return left == right;
-            case ComparisonType::NOT_EQUALS:
-              return left != right;
-            case ComparisonType::LESSER:
-              return left < right;
-            case ComparisonType::LESS_EQ:
-              return left <= right;
-            case ComparisonType::GREATER:
-              return left > right;
-            case ComparisonType::GREAT_EQ:
-              return left >= right;
-            }
-          }));
-    }
-    return std::nullopt;
   }
       
 private:
+  static constexpr auto LPAREN = R"(\()";
+  static constexpr auto RPAREN = R"(\))";
+  
   static constexpr auto EQUALS = R"(==)";
   static constexpr auto NOT_EQUALS = R"(=/=)";
   static constexpr auto LESSER = R"(<)";
@@ -108,8 +94,94 @@ private:
   static constexpr auto LESS_EQ = R"(<=)";
   static constexpr auto GREAT_EQ = R"(>=)";
 
+  static constexpr auto PLUS = R"(\+)";
+  static constexpr auto MINUS = R"(-)";
+  static constexpr auto TIMES = R"(\*)";
+  static constexpr auto DIV = R"(/)";
+  static constexpr auto MOD = R"(\%)";
+
   static constexpr auto NUM = R"(-?[1-9][0-9]*|0)";
   static constexpr auto VAR = R"(x)";
+  static constexpr auto CAP = R"(N)";
+
+  std::optional<ExprType> match_expression() {
+    std::optional<ExprType> retVal;
+    if (match_token(VAR)) {
+      return std::make_optional([](int x) { return x; });
+    } else if(match_token(CAP)) {
+      return std::make_optional([N=this->N](int) { return N; });
+    } else if (auto opt_num = match_number(); opt_num) {
+      return std::make_optional([retNum = *opt_num](int) { return retNum; });
+    } else if (match_token(LPAREN)) {
+      if (match_token(PLUS)) {
+        auto opt_operands = match_operands("+");
+        retVal =  !opt_operands
+          ? std::nullopt
+          : std::make_optional([opt_operands](int x) {
+            auto& [l,r] = *opt_operands;
+            return l(x) + r(x);
+          });
+      } else if (match_token(MINUS)) {
+        auto opt_operands = match_operands("-");
+        retVal =  !opt_operands
+          ? std::nullopt
+          : std::make_optional([opt_operands](int x) {
+            auto& [l,r] = *opt_operands;
+            return l(x) - r(x);
+          });
+      } else if (match_token(TIMES)) {
+        auto opt_operands = match_operands("*");
+        retVal =  !opt_operands
+          ? std::nullopt
+          : std::make_optional([opt_operands](int x) {
+            auto& [l,r] = *opt_operands;
+            return l(x) * r(x);
+          });
+      } else if (match_token(DIV)) {
+        auto opt_operands = match_operands("/");
+        retVal =  !opt_operands
+          ? std::nullopt
+          : std::make_optional([opt_operands](int x) {
+            auto& [l,r] = *opt_operands;
+            return l(x) / r(x);
+          });
+      } else if (match_token(MOD)) {
+        auto opt_operands = match_operands("%");
+        retVal =  !opt_operands
+          ? std::nullopt
+          : std::make_optional([opt_operands](int x) {
+            auto& [l,r] = *opt_operands;
+            return l(x) % r(x);
+          });
+      } else {
+        reportError("Expected one of +, -, *, /, or % at the start of an arithmetic expression.");
+        return std::nullopt;
+      }
+
+      if (!match_token(RPAREN)) {
+        reportError("Expected ) at the end of an arithmetic expression.");
+        return std::nullopt;
+      }
+      return retVal;
+    } else {
+      reportError("Expected a number, \"x\", \"N\", or ( for the start of a new expression.");
+      return std::nullopt;
+    }
+  }
+
+  std::optional<std::pair<ExprType,ExprType>> match_operands (std::string operationName) {
+    auto opt_leftOp = match_expression();
+    if (!opt_leftOp) {
+      reportError("Could not parse left operand of "+operationName);
+      return std::nullopt;
+    }
+    auto opt_rightOp = match_expression();
+    if (!opt_rightOp) {
+      reportError("Could not parse right operand of "+operationName);
+      return std::nullopt;
+    }
+    return std::make_optional(std::make_pair(*opt_leftOp, *opt_rightOp));
+  }
 
   std::optional<int> match_number() {
     std::string numStr;
@@ -117,6 +189,8 @@ private:
       ? std::make_optional(std::stoi(numStr))
       : std::nullopt;
   }
+
+  int N;
 };
 
 void PrintUsage() {
@@ -157,14 +231,14 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  auto apParserPtr = std::make_shared<CollatzAPParser>(stream);
+  auto apParserPtr = std::make_shared<CollatzAPParser>(stream,N);
   LTLParser<AP> ltlParser (stream, apParserPtr, [](std::shared_ptr<Parser> p) {
     return std::dynamic_pointer_cast<CollatzAPParser>(p)->Parse();
   });
 
   std::optional<ltl::Formula<AP>> opt_spec;
   try {
-    opt_spec = ltlParser.Parse();
+    opt_spec = ltlParser.parse();
   } catch(std::exception e) {
     std::cout << "Fatal error occurred while parsing: " << e.what() << "\n";
     stream.close();
