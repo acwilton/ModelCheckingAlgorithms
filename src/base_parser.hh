@@ -7,21 +7,41 @@
 #include <regex>
 #include <string>
 
+template <typename R>
 class Parser {
 public:
-  Parser (std::istream& stream)
-    : stream(stream),
+  Parser ()
+    : Parser(nullptr)
+    {}
+
+  Parser (std::istream* streamPtr)
+    : streamPtr(streamPtr),
       errorsOccurred(false),
       currentLine(""),
       currentLineNum(0)
     {
-      if (!stream.good()) {
+      if (!stream().good()) {
         errorsOccurred = true;
         std::cout << "Parser constructed with a bad stream.\n";
       }
     }
   virtual ~Parser() {}
 
+  // Call our parse function but with another parser's stream
+  template <typename T>
+  std::optional<R> parse(Parser<T>* other) {
+    other->transferStream(this);
+    auto opt_v = parse();
+    transferStream(other);
+    return opt_v;
+  }
+
+  virtual std::optional<R> parse() = 0;
+
+  template <typename T>
+  friend class Parser; // Parser is friends with all other Parser's
+
+protected:
   virtual bool match_token(std::string tokenPattern) {
     std::string result;
     return match_token(result, tokenPattern);
@@ -43,8 +63,8 @@ public:
     std::regex whitespacePattern(R"(^\s+)");
     std::smatch whitespaceMatch;
 
-    while(std::regex_search(currentLine, whitespaceMatch, whitespacePattern) || (currentLine == "" && stream)) {
-      if (!eat_characters(whitespaceMatch[0].str().size()) && !stream.eof()) {
+    while(std::regex_search(currentLine, whitespaceMatch, whitespacePattern) || (currentLine == "" && stream())) {
+      if (!eat_characters(whitespaceMatch[0].str().size()) && !stream().eof()) {
         errorsOccurred = true;
         throw std::runtime_error ("I/O failure.");
       }
@@ -52,14 +72,14 @@ public:
   }
 
   virtual bool eat_characters(int numChars) {
-    while ((currentLine == "" || numChars > 0) && stream) {
+    while ((currentLine == "" || numChars > 0) && stream()) {
       if (numChars < currentLine.size()) {
         currentLine = currentLine.substr(numChars);
         numChars = 0;
       } else {
         numChars -= currentLine.size();
         currentLine = "";
-        while (std::getline(stream, currentLine) && currentLine == "") {currentLineNum++;}
+        while (std::getline(stream(), currentLine) && currentLine == "") {currentLineNum++;}
         currentLineNum++; // One additional increment to account for last execution of getline in which loop condition failed.
       }
     }
@@ -69,39 +89,35 @@ public:
   virtual void reportError(std::string errorMsg) {
     errorsOccurred = true;
     std::cout << "Line " << currentLineNum << ": " << errorMsg << "\n";
-    if (stream.eof()) {
+    if (stream().eof()) {
       std::cout << "Reached end of file before finished parsing\n";
-    } else if (stream.bad()){
+    } else if (stream().bad()){
       std::cout << "I/O error occurred while parsing\n";
     }
   }
 
-  virtual void transferStream(Parser* parser) {
-    if (parser != nullptr) {
-      int streamOffset = -static_cast<int>(currentLine.size());
-      stream.unget();
-      char p = stream.get();
-      if (p == '\n') {
-        --streamOffset; // Must decrease offset by one because currentLine doesn't include the \n that exists in the stream
-      }
-      stream.seekg(streamOffset, std::ios_base::cur);
-      currentLine = "";
-      parser->currentLineNum = currentLineNum;
-    }
+  template <typename T>
+  void transferStream(Parser<T>* parser) {
+    parser->streamPtr = streamPtr;
+    parser->currentLine = currentLine;
+    parser->currentLineNum = currentLineNum;
   }
 
-  virtual std::string getCurrentLine() const {
-    return currentLine;
+  std::istream& stream() {
+    static std::istream badStream(nullptr);
+    return (streamPtr == nullptr) ? badStream : *streamPtr;
   }
 
-protected:
-  std::istream& stream;
+  bool errors() {
+    return errorsOccurred;
+  }
+
+private:
+  std::istream* streamPtr;
+  std::string currentLine;
   bool errorsOccurred;
   int currentLineNum;
-  std::string currentLine;
-  
-private:
-  Parser() = delete;
+
   Parser(Parser const&) = delete;
   Parser(Parser&&) = delete;
   Parser& operator=(Parser const&) = delete;

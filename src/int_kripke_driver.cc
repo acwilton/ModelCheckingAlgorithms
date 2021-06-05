@@ -16,19 +16,32 @@
 using namespace mc;
 
 using AP = EqFunction<bool(int const&)>;
+using Formula = ltl::Formula<AP>;
 
-class CollatzAPParser final : public Parser{
+/*
+class IntKripkeParser final : public Parser{
+
+};
+
+class ArithmeticParser final : public Parser {
+
+};
+*/
+
+class CollatzAPParser final : public Parser<ltl::Formula<AP>>{
 public:
-
   using ExprType = std::function<int(int)>;
 
-  CollatzAPParser(std::istream& stream, int N)
-    : Parser(stream),
+  using Parser<Formula>::reportError;
+  using Parser<Formula>::match_token;
+
+  CollatzAPParser(std::istream* stream, int N)
+    : Parser<Formula>(stream),
       N(N)
     {}
   ~CollatzAPParser() = default;
 
-  std::optional<ltl::Formula<AP>> parse() {
+  std::optional<Formula> parse() {
     if (match_token(EQUALS)) {
       auto opt_operands = match_operands("==");
       return !opt_operands
@@ -86,7 +99,7 @@ public:
 private:
   static constexpr auto LPAREN = R"(\()";
   static constexpr auto RPAREN = R"(\))";
-  
+
   static constexpr auto EQUALS = R"(==)";
   static constexpr auto NOT_EQUALS = R"(=/=)";
   static constexpr auto LESSER = R"(<)";
@@ -231,12 +244,10 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  auto apParserPtr = std::make_shared<CollatzAPParser>(stream,N);
-  LTLParser<AP> ltlParser (stream, apParserPtr, [](std::shared_ptr<Parser> p) {
-    return std::dynamic_pointer_cast<CollatzAPParser>(p)->Parse();
-  });
+  auto apParserPtr = std::make_shared<CollatzAPParser>(&stream,N);
+  LTLParser<AP> ltlParser (&stream, apParserPtr);
 
-  std::optional<ltl::Formula<AP>> opt_spec;
+  std::optional<Formula> opt_spec;
   try {
     opt_spec = ltlParser.parse();
   } catch(std::exception e) {

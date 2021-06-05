@@ -12,25 +12,28 @@
 #include "ltl.hh"
 
 template <typename AP>
-class LTLParser final : public Parser{
+class LTLParser final : public Parser<mc::ltl::Formula<AP>>{
 public:
-  using ParserInterface = std::function<std::optional<mc::ltl::Formula<AP>>(std::shared_ptr<Parser>)>;
+  using Formula = mc::ltl::Formula<AP>;
+  using Parser<Formula>::reportError;
+  using Parser<Formula>::match_token;
+  using Parser<Formula>::eat_whitespace;
+  using Parser<Formula>::errors;
 
-  LTLParser(std::istream& stream, std::shared_ptr<Parser> apParser, ParserInterface parserInterface)
-    : Parser(stream),
-      apParser(apParser),
-      parserInterface(parserInterface)
+  LTLParser(std::istream* stream, std::shared_ptr<Parser<Formula>> apParser)
+    : Parser<Formula>(stream),
+      apParser(apParser)
     {}
   ~LTLParser() = default;
 
-  std::optional<mc::ltl::Formula<AP>> Parse() {
+  std::optional<Formula> parse() {
     auto opt_formula = match_formula();
     if (!opt_formula) {
       reportError("Unable to parse LTL formula.");
       return opt_formula;
     }
     eat_whitespace();
-    if (!errorsOccurred) {
+    if (!errors()) {
       return opt_formula;
     }
     return std::nullopt;
@@ -58,14 +61,14 @@ private:
   static constexpr auto FUTURE = "F";
   static constexpr auto GLOBAL = "G";
 
-  std::optional<mc::ltl::Formula<AP>> match_formula() {
+  std::optional<Formula> match_formula() {
     if (!match_token(LPAREN)) {
       return std::nullopt;
     }
 
     // The following two lambdas are introduced just to reduce code a bit
     auto parse1AryFormula = [&](auto formulaFactory, std::string formulaName)
-      -> std::optional<mc::ltl::Formula<AP>> {
+      -> std::optional<Formula> {
       if (auto opt_sub = match_formula(); opt_sub) {
         return std::make_optional(formulaFactory(*opt_sub));
       }
@@ -73,7 +76,7 @@ private:
       return std::nullopt;
     };
     auto parse2AryFormula = [&](auto formulaFactory, std::string formulaName)
-      -> std::optional<mc::ltl::Formula<AP>> {
+      -> std::optional<Formula> {
       auto opt_sub1 = match_formula();
       if (!opt_sub1) {
         reportError("Failed to parse first subformula of "+formulaName);
@@ -87,7 +90,7 @@ private:
       return std::make_optional(formulaFactory(*opt_sub1, *opt_sub2));
     };
 
-    std::optional<mc::ltl::Formula<AP>> opt_formula;
+    std::optional<Formula> opt_formula;
     if (match_token(GLOBAL)) {
       opt_formula = parse1AryFormula(mc::ltl::make_global<AP>, GLOBAL);
     } else if (match_token(FUTURE)) {
@@ -103,9 +106,7 @@ private:
     } else if (match_token(AND)) {
       opt_formula = parse2AryFormula(mc::ltl::make_and<AP>, AND);
     } else {
-      transferStream(apParser.get());
-      opt_formula = parserInterface(apParser);
-      apParser->transferStream(this);
+      opt_formula = apParser->parse(this);
     }
 
     if (!match_token(RPAREN)) {
@@ -116,8 +117,7 @@ private:
     return opt_formula;
   }
 
-  std::shared_ptr<Parser> apParser;
-  ParserInterface parserInterface;
+  std::shared_ptr<Parser<Formula>> apParser;
 };
 
 #endif
