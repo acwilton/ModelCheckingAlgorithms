@@ -87,6 +87,7 @@ namespace mc {
     template <typename AP>
     class Formula {
     public:
+      Formula() = default;
       Formula(Formula const&) = default;
       Formula(Formula&&) = default;
 
@@ -162,8 +163,6 @@ namespace mc {
             apSet.insert(ap);
           }
         }
-
-      Formula() = delete;
 
       FormulaForm formulaForm;
       std::variant<std::vector<Formula>,AP> children;

@@ -28,4 +28,5 @@
 *~
 
 # Executables
-driver
+buchi_driver
+int_kripke_driver

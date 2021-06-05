@@ -6,118 +6,115 @@
 #include <functional>
 #include <utility>
 #include <optional>
-#include <memory>
+#include <tuple>
 
-#include "base_parser.hh"
+#include "parser.hh"
 #include "ltl.hh"
 
-template <typename AP>
-class LTLParser final : public Parser<mc::ltl::Formula<AP>>{
-public:
-  using Formula = mc::ltl::Formula<AP>;
-  using Parser<Formula>::reportError;
-  using Parser<Formula>::match_token;
-  using Parser<Formula>::eat_whitespace;
-  using Parser<Formula>::errors;
+namespace parser {
+  template <typename AP>
+  class LTLParser {
+  public:
+    using Formula = mc::ltl::Formula<AP>;
 
-  LTLParser(std::istream* stream, std::shared_ptr<Parser<Formula>> apParser)
-    : Parser<Formula>(stream),
-      apParser(apParser)
-    {}
-  ~LTLParser() = default;
+    LTLParser() = default;
+    LTLParser(Parser<Formula> const& apParser)
+      : apParser(apParser)
+      {}
+    LTLParser(LTLParser const&) = default;
+    LTLParser(LTLParser&&) = default;
+    ~LTLParser() = default;
+    LTLParser& operator=(LTLParser const&) = default;
+    LTLParser& operator=(LTLParser&&) = default;
 
-  std::optional<Formula> parse() {
-    auto opt_formula = match_formula();
-    if (!opt_formula) {
-      reportError("Unable to parse LTL formula.");
-      return opt_formula;
+    void setAPParser(Parser<Formula> const& newAPParser) {
+      apParser = newAPParser;
     }
-    eat_whitespace();
-    if (!errors()) {
-      return opt_formula;
+
+    std::optional<Formula> operator()(ParserStream& pStream) const {
+      auto opt_formula = match_formula(pStream);
+      if (!opt_formula) {
+        pStream.reportError("Unable to parse LTL formula.");
+        return opt_formula;
+      }
+      pStream.eat_whitespace();
+      if (!pStream.errors()) {
+        return opt_formula;
+      }
+      return std::nullopt;
     }
-    return std::nullopt;
-  }
       
-private:
-  // Tokens
-  static constexpr auto LPAREN = R"(\()";
-  static constexpr auto RPAREN = R"(\))";
+  private:
+    // Tokens
+    static constexpr auto LPAREN = R"(\()";
+    static constexpr auto RPAREN = R"(\))";
     
-  static constexpr auto EQUALS = R"(\=\=)";
-  static constexpr auto NOT_EQUALS = R"(\!\=)";
-  static constexpr auto LESSER = R"(<)";
-  static constexpr auto GREATER = R"(>)";
-  static constexpr auto LESS_EQ = R"(<\=)";
-  static constexpr auto GREAT_EQ = R"(>\=)";
+    static constexpr auto EQUALS = R"(\=\=)";
+    static constexpr auto NOT_EQUALS = R"(\!\=)";
+    static constexpr auto LESSER = R"(<)";
+    static constexpr auto GREATER = R"(>)";
+    static constexpr auto LESS_EQ = R"(<\=)";
+    static constexpr auto GREAT_EQ = R"(>\=)";
 
-  static constexpr auto NUM = R"(-?[1-9][0-9]*)";
+    static constexpr auto NUM = R"(-?[1-9][0-9]*)";
 
-  static constexpr auto AND = R"(&&)";
-  static constexpr auto OR = R"(\|\|)";
-  static constexpr auto NOT = R"(!)";
-  static constexpr auto UNTIL = "U";
-  static constexpr auto RELEASE = "R";
-  static constexpr auto FUTURE = "F";
-  static constexpr auto GLOBAL = "G";
+    static constexpr auto AND = R"(&&)";
+    static constexpr auto OR = R"(\|\|)";
+    static constexpr auto NOT = R"(!)";
+    static constexpr auto UNTIL = "U";
+    static constexpr auto RELEASE = "R";
+    static constexpr auto FUTURE = "F";
+    static constexpr auto GLOBAL = "G";
 
-  std::optional<Formula> match_formula() {
-    if (!match_token(LPAREN)) {
-      return std::nullopt;
-    }
-
-    // The following two lambdas are introduced just to reduce code a bit
-    auto parse1AryFormula = [&](auto formulaFactory, std::string formulaName)
-      -> std::optional<Formula> {
-      if (auto opt_sub = match_formula(); opt_sub) {
-        return std::make_optional(formulaFactory(*opt_sub));
-      }
-      reportError("Failed to parse subformula of " + formulaName);
-      return std::nullopt;
-    };
-    auto parse2AryFormula = [&](auto formulaFactory, std::string formulaName)
-      -> std::optional<Formula> {
-      auto opt_sub1 = match_formula();
-      if (!opt_sub1) {
-        reportError("Failed to parse first subformula of "+formulaName);
+    std::optional<Formula> match_formula(ParserStream& pStream) const {
+      if (!pStream.match_token(LPAREN)) {
         return std::nullopt;
       }
-      auto opt_sub2 = match_formula();
-      if (!opt_sub2) {
-        reportError("Failed to parse second subformula of "+formulaName);
+
+      auto errMsgGen = [](std::string name) {
+        return [name](int x) {
+          std::string posString = (x == 0) ? "first" : "second";
+          return "Failed to parse "+posString+" subformula of "+name+".";
+        };
+      };
+
+      std::optional<Formula> opt_formula;
+      if (pStream.match_token(GLOBAL)) {
+        opt_formula = parseFormula<1>(pStream, mc::ltl::make_global<AP>, errMsgGen(GLOBAL));
+      } else if (pStream.match_token(FUTURE)) {
+        opt_formula = parseFormula<1>(pStream, mc::ltl::make_future<AP>, errMsgGen(FUTURE));
+      } else if (pStream.match_token(UNTIL)) {
+        opt_formula = parseFormula<2>(pStream, mc::ltl::make_until<AP>, errMsgGen(UNTIL));
+      } else if (pStream.match_token(RELEASE)) {
+        opt_formula = parseFormula<2>(pStream, mc::ltl::make_release<AP>, errMsgGen(RELEASE));
+      } else if (pStream.match_token(NOT)) {
+        opt_formula = parseFormula<1>(pStream, mc::ltl::make_not<AP>, errMsgGen(NOT));
+      } else if (pStream.match_token(OR)) {
+        opt_formula = parseFormula<2>(pStream, mc::ltl::make_or<AP>, errMsgGen("||"));
+      } else if (pStream.match_token(AND)) {
+        opt_formula = parseFormula<2>(pStream, mc::ltl::make_and<AP>, errMsgGen(AND));
+      } else {
+        opt_formula = apParser(pStream);
+      }
+
+      if (!pStream.match_token(RPAREN)) {
+        pStream.reportError("Expected ) after formula.");
         return std::nullopt;
       }
-      return std::make_optional(formulaFactory(*opt_sub1, *opt_sub2));
+
+      return opt_formula;
+    }
+
+    template <int Arity, typename FactoryType>
+    auto parseFormula (ParserStream& pStream, FactoryType formulaFactory, std::function<std::string(int)>const& errMsg) const {
+      auto opt_subformulas = parseN<Arity,Formula>(*this, pStream, errMsg);
+      return !opt_subformulas
+        ? std::nullopt
+        : std::make_optional(std::apply(formulaFactory, *opt_subformulas));
     };
 
-    std::optional<Formula> opt_formula;
-    if (match_token(GLOBAL)) {
-      opt_formula = parse1AryFormula(mc::ltl::make_global<AP>, GLOBAL);
-    } else if (match_token(FUTURE)) {
-      opt_formula = parse1AryFormula(mc::ltl::make_future<AP>, FUTURE);
-    } else if (match_token(UNTIL)) {
-      opt_formula = parse2AryFormula(mc::ltl::make_until<AP>, UNTIL);
-    } else if (match_token(RELEASE)) {
-      opt_formula = parse2AryFormula(mc::ltl::make_release<AP>, RELEASE);
-    } else if (match_token(NOT)) {
-      opt_formula = parse1AryFormula(mc::ltl::make_not<AP>, NOT);
-    } else if (match_token(OR)) {
-      opt_formula = parse2AryFormula(mc::ltl::make_or<AP>, "||");
-    } else if (match_token(AND)) {
-      opt_formula = parse2AryFormula(mc::ltl::make_and<AP>, AND);
-    } else {
-      opt_formula = apParser->parse(this);
-    }
-
-    if (!match_token(RPAREN)) {
-      reportError("Expected ) after formula.");
-      return std::nullopt;
-    }
-
-    return opt_formula;
-  }
-
-  std::shared_ptr<Parser<Formula>> apParser;
-};
+    Parser<Formula> apParser;
+  };
+}
 
 #endif
