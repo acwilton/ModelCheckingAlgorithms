@@ -360,11 +360,11 @@ namespace parser {
 void PrintUsage() {
   std::cout << "Usage: collatz <ltl_filename> [modulo_int]\n";
   std::cout << "This will read the ltl specification provided in the ltl_filename and model check it on the reverse collatz graph modulo the modula_int parameter provided.\n";
-  std::cout << "modulo_int must be greater than 0 and if it is not provided, it will default to the arbitrary number 1170.\n";
+  std::cout << "modulo_int must be greater than 0 and if it is not provided, it will default to the arbitrary number 1000.\n";
 }
 
 int main(int argc, char* argv[]) {
-  int N = 1170; // Arbitrary number
+  int N = 1000; // Arbitrary number
   if (argc > 3) {
     std::cout << "Too many arguments. Expected at most 2 but got " << argc - 1 << "\n\n";
     PrintUsage();
