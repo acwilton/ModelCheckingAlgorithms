@@ -110,8 +110,20 @@ EXPR      -> ( + EXPR EXPR )
           -> N
           -> INTEGER
 ```
-The semantics of a `CHAR_FUNC`, `F`, is such that an integer s "intersects" with `F` if either `F` is an integer v and v == s, or s satisfies the boolean function defined by F in the grammar. So for instance
+The semantics of a `CHAR_FUNC`, `F`, is such that an integer s "intersects" with `F`, or "satisfies" `F`, if either `F` is an integer v and v == s, or s satisfies the boolean function defined by F in the grammar. So for instance
 ```
 fair = [{(== (% s 2) 0)}, {(== (% s 3) 1), 0, 5}]
 ```
 says that a path is fair iff it reaches an even integer an infinite number of times, and if it reaches either 0, 5, or an integer s such that s % 3 == 1, an infinte number of times.
+
+Each of `fromi_j` are also "characterstic functions" as defined by the grammar of `CHAR_FUNC` above. Each of `toi_j` are an arithmetic expression as defined by the subgrammar `EXPR` found in both of the previously defined grammars.
+The semantics of the list of transitions
+```
+{ from1_1, from1_2, ..., from1_F1 } -> { to1_1, to1_2, ..., to1_T1 }
+{ from2_1, from2_2, ..., from2_F2 } -> { to2_1, to2_2, ..., to2_T2 }
+...
+{ fromL_1, fromL_2, ..., fromL_FL } -> { toL_1, toL_2, ..., toL_TL }
+```
+is such that an integer `f` transitions to integer `t` if there is a `fromi_j` and a `toi_k` such that `f` satisfies `fromi_j`, and `t == toi_k(f) % N`, where `toi_k(f)` is the result of plugging `f` into the arithmetic function defined by the grammar of `EXPR`. Note that this is where the cap `N` comes in. We take modulo `N` of the "heads" of every transition so that we maintain a finite structure. Note that this modulo operator, and the one definied for arithmetic expressions, is using the c++ % operator which will actually return negative values when the left operand is negative.
+
+Another way of thinking about the transition lists is that if an integer `s` satisfies any of `{ fromi_1, fromi_2, ..., fromi_Fi }`, then there is a transition from `s` to each of `toi_1(s) % N, toi_2(s) % N, ..., toi_Ti(s) % N`.
