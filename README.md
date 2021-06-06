@@ -60,14 +60,14 @@ AP      -> ( == EXPR EXPR )
         -> ( <= EXPR EXPR )
         -> ( < EXPR EXPR )
 
-EXPR    -> s
-        -> N
-        -> INTEGER
-        -> ( + EXPR EXPR )
+EXPR    -> ( + EXPR EXPR )
         -> ( - EXPR EXPR )
         -> ( * EXPR EXPR )
         -> ( / EXPR EXPR )
         -> ( % EXPR EXPR )
+        -> s
+        -> N
+        -> INTEGER
 ```
 Where INTEGER is an actual integer. The `s` is the parameter standing for the current state. The `N` stands for the cap passed in from the command line. Each of the other symbols have the obvious meaning (although to be safe, I will clarify that `=/=` means not equal, `% EXPR1 EXPR1` means `EXPR1` modulo `EXPR2`, and `/` is integer division).
 For example:
@@ -77,3 +77,41 @@ For example:
             (=/= (% s 7) 0)))))
 ```
 Says "It is not the case that in the future we will globally have even integers not divisible by 7."
+
+After the specification is written, we must define the kripke structure that the LTL specification will be checked against. The definition of a kripke structure looks as follows:
+```
+init = <init1, init2, ..., initN>
+fair = [{fair1_1, fair1_2, ..., fair1_M1},{fair2_1, fair2_2, ..., fair2_M2}, ..., {fairK_1, fairK_2, ..., fairK_MK}]
+{ from1_1, from1_2, ..., from1_F1 } -> { to1_1, to1_2, ..., to1_T1 }
+{ from2_1, from2_2, ..., from2_F2 } -> { to2_1, to2_2, ..., to2_T2 }
+...
+{ fromL_1, fromL_2, ..., fromL_FL } -> { toL_1, toL_2, ..., toL_TL }
+```
+In the above, any list (a sequence which has `...` displayed) may be empty if desired (although it may make the kripke structure very boring). For instance, a kripke structure in which all paths are fair may have no fairness sets at all and thus one would write `fair = []`.
+
+Each of `initi` in the init list `init = <...>` is simply an integer. These define the set of integers that act as the initial states of the kripke strucutre. Note that these integers are NOT taken modulo the passed in cap N.
+
+Each of `fairi_j` are a "characteristic function" as defined by the following grammar:
+```
+CHAR_FUNC -> ( == EXPR EXPR )
+          -> ( =/= EXPR EXPR )
+          -> ( >= EXPR EXPR )
+          -> ( > EXPR EXPR )
+          -> ( <= EXPR EXPR )
+          -> ( < EXPR EXPR )
+          -> INTEGER
+
+EXPR      -> ( + EXPR EXPR )
+          -> ( - EXPR EXPR )
+          -> ( * EXPR EXPR )
+          -> ( / EXPR EXPR )
+          -> ( % EXPR EXPR )
+          -> s
+          -> N
+          -> INTEGER
+```
+The semantics of a `CHAR_FUNC`, `F`, is such that an integer s "intersects" with `F` if either `F` is an integer v and v == s, or s satisfies the boolean function defined by F in the grammar. So for instance
+```
+fair = [{(== (% s 2) 0)}, {(== (% s 3) 1), 0, 5}]
+```
+says that a path is fair iff it reaches an even integer an infinite number of times, and if it reaches either 0, 5, or an integer s such that s % 3 == 1, an infinte number of times.
