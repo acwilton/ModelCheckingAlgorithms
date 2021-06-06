@@ -27,13 +27,9 @@ namespace parser {
     ArithmeticParser(int N)
       : N(N)
       {}
-    ArithmeticParser(ArithmeticParser&&) = default;
-    ArithmeticParser(ArithmeticParser const&) = default;
     ~ArithmeticParser() = default;
-    ArithmeticParser& operator=(ArithmeticParser const&) = default;
-    ArithmeticParser& operator=(ArithmeticParser&&) = default;
 
-    std::optional<ArithType> operator()(ParserStream& pStream) {
+    std::optional<ArithType> operator()(ParserStream& pStream) const {
       if (pStream.match_token(VAR)) {
         return std::make_optional([](int s) { return s; });
       } else if(pStream.match_token(CAP)) {
@@ -97,7 +93,7 @@ namespace parser {
     static constexpr auto DIV = R"(/)";
     static constexpr auto MOD = R"(\%)";
 
-    static constexpr auto VAR = R"(x)";
+    static constexpr auto VAR = R"(s)";
     static constexpr auto CAP = R"(N)";
 
     int N;
@@ -175,6 +171,190 @@ namespace parser {
   private:
     ComparisonParser compParser;
   };
+
+  class IntKripkeParser {
+  public:
+    using TransFuncType = std::function<int(int)>;
+    using CharFuncType = std::function<bool(int const&)>;
+    using TransSetType = std::pair<auto_set<CharFuncType>, auto_set<TransFuncType>>;
+    IntKripkeParser(int N)
+      : N(N),
+        apParser(N),
+        ltlParser(apParser)
+      {
+        ComparisonParser compParser(N);
+        charFuncParser = [compParser](ParserStream& pStream) -> std::optional<CharFuncType> {
+          if (auto opt_int = match_integer(pStream); opt_int) {
+            return [v = *opt_int](const int& s) {
+              return s == v;
+            };
+          }
+          if (!pStream.match_token(LPAREN)) {
+            return std::nullopt;
+          }
+          auto opt_charFun = compParser(pStream);
+          if (!opt_charFun) { return std::nullopt; }
+          if (!pStream.match_token(RPAREN)) {
+            pStream.reportError("Expected ) at end of boolean function.");
+            return std::nullopt;
+          }
+          return [charFun = *opt_charFun](const int& s) {
+            return charFun(s);
+          };
+        };
+
+        ArithmeticParser arithParser(N);
+        transFuncParser = [arithParser](ParserStream& pStream) -> std::optional<TransFuncType> {
+          if (auto opt_int = match_integer(pStream); opt_int) {
+            return [v = *opt_int](int) { return v; };
+          }
+          return arithParser(pStream);
+        };
+      }
+    ~IntKripkeParser() = default;
+
+    std::optional<Kripke<int>> operator()(ParserStream& pStream) {
+      // Parse initial states
+      if (!pStream.match_token(INIT)) {
+        pStream.reportError("Expected \"init\" keyword at start of kripke specification.");
+        return std::nullopt;
+      }
+      if (!pStream.match_token(DEF)) {
+        pStream.reportError("Expected = after \"init\".");
+        return std::nullopt;
+      }
+      if (!pStream.match_token(LANGLE)) {
+        pStream.reportError("Expected < after \"init =\".");
+        return std::nullopt;
+      }
+
+      auto intVec = parseStar<int>(SeparatedParser<int>(match_integer, COMMA), pStream);
+      Kripke<int>::StateSet initSet (intVec.begin(), intVec.end());
+
+      if (!pStream.match_token(RANGLE)) {
+        pStream.reportError("Expected > at end of init specification.");
+        return std::nullopt;
+      }
+
+      // Parse fairness constraints
+      if (!pStream.match_token(FAIR)) {
+        pStream.reportError("Expected \"fair\" keyword after specifying the initial states.");
+        return std::nullopt;
+      }
+      if (!pStream.match_token(DEF)) {
+        pStream.reportError("Expected = after \"fair\".");
+        return std::nullopt;
+      }
+      if (!pStream.match_token(LSQUARE)) {
+        pStream.reportError("Expected [ after \"fair =\".");
+        return std::nullopt;
+      }
+
+      auto constraintParser = [this](ParserStream& pStream)
+        -> std::optional<CharFuncType> {
+        if (!pStream.match_token(LBRACE)) {
+          return std::nullopt;
+        }
+
+        auto constraintVec = parseStar<CharFuncType>(SeparatedParser<CharFuncType>(charFuncParser, COMMA), pStream);
+        auto_set<CharFuncType> constraintSet(constraintVec.begin(), constraintVec.end());
+
+        if (!pStream.match_token(RBRACE)) {
+          pStream.reportError("Expected } at end of fairness constraint list.");
+          return std::nullopt;
+        }
+        return std::make_optional([constraintSet](int s) {
+          for (auto& constraint : constraintSet) {
+            if (constraint(s)) {
+              return true;
+            }
+          }
+          return false;
+        });
+      };
+
+      auto fairnessConstraints = parseStar<CharFuncType>(SeparatedParser<CharFuncType>(constraintParser, COMMA), pStream);
+
+      if (!pStream.match_token(RSQUARE)) {
+        pStream.reportError("Expected ] at end of fairness specification.");
+        return std::nullopt;
+      }
+
+      auto intTransitionParser = [this](ParserStream& pStream)
+        -> std::optional<TransSetType> {
+        if (!pStream.match_token(LBRACE)) {
+          return std::nullopt;
+        }
+
+        auto fromVec = parseStar<CharFuncType>(SeparatedParser<CharFuncType>(charFuncParser, COMMA), pStream);
+        auto_set<CharFuncType> fromSet(fromVec.begin(), fromVec.end());
+
+        if (!pStream.match_token(RBRACE)) {
+          pStream.reportError("Expected } at end of \"from\" list in the specification of a set of kripke transitions.");
+          return std::nullopt;
+        }
+        if (!pStream.match_token(ARROW)) {
+          pStream.reportError("Expected -> after \"from\" list in the specification of a set of kripke transitions.");
+          return std::nullopt;
+        }
+        if (!pStream.match_token(LBRACE)) {
+          pStream.reportError("Expected { at start of \"to\" list in the specification of a set of kripke transitions.");
+          return std::nullopt;
+        }
+
+        auto toVec = parseStar<TransFuncType>(SeparatedParser<TransFuncType>(transFuncParser, COMMA), pStream);
+        auto_set<TransFuncType> toSet(toVec.begin(), toVec.end());
+
+        if (!pStream.match_token(RBRACE)) {
+          pStream.reportError("Expected } at end of \"to\" list in the specification of a set of kripke transitions.");
+          return std::nullopt;
+        }
+
+        return std::make_optional(std::make_pair(fromSet, toSet));
+      };
+
+      auto transitionVec = parseStar<TransSetType>(intTransitionParser, pStream);
+      auto kripkeTransitionFunc = [transitionVec, N = this->N] (int s) {
+        auto_set<int> toSet;
+        for (auto const& [fromFuncSet, toFuncSet] : transitionVec) {
+          for (auto const& charFunc : fromFuncSet) {
+            if (charFunc(s)) {
+              for (auto const& transFunc : toFuncSet) {
+                auto t = transFunc(s);
+                toSet.insert(t % N);
+              }
+            }
+          }
+        }
+        return toSet;
+      };
+
+      return Kripke<int>(initSet, kripkeTransitionFunc, fairnessConstraints);
+    }
+
+  private:
+    static constexpr auto LPAREN = R"(\()";
+    static constexpr auto RPAREN = R"(\))";
+    static constexpr auto LBRACE = R"(\{)";
+    static constexpr auto RBRACE = R"(\})";
+    static constexpr auto LANGLE = R"(\<)";
+    static constexpr auto RANGLE = R"(\>)";
+    static constexpr auto LSQUARE = R"(\[)";
+    static constexpr auto RSQUARE = R"(\])";
+    static constexpr auto COMMA = R"(\,)";
+    
+    static constexpr auto INIT = R"(init)";
+    static constexpr auto FAIR = R"(fair)";
+    static constexpr auto DEF = R"(=)";
+
+    static constexpr auto ARROW = R"(-\>)";
+
+    int N;
+    Parser<TransFuncType> transFuncParser;
+    Parser<CharFuncType> charFuncParser;
+    IntAPParser apParser;
+    LTLParser<AP> ltlParser;
+  };
 }
 
 void PrintUsage() {
@@ -218,26 +398,33 @@ int main(int argc, char* argv[]) {
   parser::ParserStream pStream(&stream);
   parser::IntAPParser intAPParser(N);
   parser::LTLParser<AP> ltlParser (intAPParser);
+  parser::IntKripkeParser kripkeParser(N);
 
   std::optional<Formula> opt_spec;
+  std::optional<Kripke<int>> opt_kripke;
   try {
     opt_spec = ltlParser(pStream);
+    if (!opt_spec) {
+      stream.close();
+      return -1;
+    }
+    opt_kripke = kripkeParser(pStream);
+    if (!opt_kripke) {
+      stream.close();
+      return -1;
+    }
   } catch(std::exception e) {
     std::cout << "Fatal error occurred while parsing: " << e.what() << "\n";
     stream.close();
     return -1;
   }
-  if (!opt_spec) {
-    stream.close();
-    return -1;
-  }
-  auto spec = ltl::make_not(*opt_spec); // We negate so that we properly check for existance of counterexample
-  
+
   if (std::string dummyLine; std::getline(stream, dummyLine) && dummyLine != "") {
     std::cout << "Parsing has completed, but there is still excess content in the file. Ignoring.\n";
   }
   stream.close();
 
+  /*
   // Defining the Collatz graph (https://en.wikipedia.org/wiki/Collatz_conjecture#In_reverse)
   // as a kripke structure except that all numbers are taken mod N (to make it finite)
   Kripke<int> reverseCollatz(
@@ -249,8 +436,11 @@ int main(int argc, char* argv[]) {
       }
       return nextInts;
     });
-
-  auto opt_lasso = ModelCheck(reverseCollatz, ltl::Normalize(spec));
+  */
+  auto spec = ltl::make_not(*opt_spec); // We negate so that we properly check for existance of counterexample
+  auto kripke = *opt_kripke;
+  
+  auto opt_lasso = ModelCheck(kripke, ltl::Normalize(spec));
   if (opt_lasso) {
     std::cout << "The LTL specification does not hold.\n";
     const auto& [stem, loop] = *opt_lasso;

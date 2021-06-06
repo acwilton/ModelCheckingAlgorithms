@@ -32,6 +32,14 @@ namespace parser {
     }
 
     std::optional<Formula> operator()(ParserStream& pStream) const {
+      if (!pStream.match_token(SPEC)) {
+        pStream.reportError("Expected \"spec\" keyword at start of LTL specification.");
+        return std::nullopt;
+      }
+      if (!pStream.match_token(DEF)) {
+        pStream.reportError("Expected = after \"spec\".");
+        return std::nullopt;
+      }
       auto opt_formula = match_formula(pStream);
       if (!opt_formula) {
         pStream.reportError("Unable to parse LTL formula.");
@@ -65,6 +73,9 @@ namespace parser {
     static constexpr auto RELEASE = "R";
     static constexpr auto FUTURE = "F";
     static constexpr auto GLOBAL = "G";
+
+    static constexpr auto SPEC = R"(spec)";
+    static constexpr auto DEF = R"(=)";
 
     std::optional<Formula> match_formula(ParserStream& pStream) const {
       if (!pStream.match_token(LPAREN)) {
@@ -107,7 +118,7 @@ namespace parser {
 
     template <int Arity, typename FactoryType>
     auto parseFormula (ParserStream& pStream, FactoryType formulaFactory, std::function<std::string(int)>const& errMsg) const {
-      auto opt_subformulas = parseN<Arity,Formula>(*this, pStream, errMsg);
+      auto opt_subformulas = parseN<Arity,Formula>(std::bind(&LTLParser::match_formula, *this, std::placeholders::_1), pStream, errMsg);
       return !opt_subformulas
         ? std::nullopt
         : std::make_optional(std::apply(formulaFactory, *opt_subformulas));
