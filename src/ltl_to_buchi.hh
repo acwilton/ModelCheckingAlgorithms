@@ -107,6 +107,7 @@ namespace mc {
       void UpdateSplit(std::unordered_map<int, LTLNode<AP>>& open,
                        NodeRelations& nodeRelations,
                        auto_set<Formula<AP>>& untilSet,
+                       auto_set<std::pair<bool, AP>>& nnfSet,
                        LTLNode<AP> & q,
                        Formula<AP> const& psi) {
         auto Split = [&nodeRelations,&q]() {
@@ -118,7 +119,9 @@ namespace mc {
         };
 
         switch(psi.form()) {
-        case FormulaForm::Atomic: {
+        case FormulaForm::Atomic:
+        case FormulaForm::Not: {
+          nnfSet.insert(std::make_pair(psi.form() == FormulaForm::Atomic, psi.getAP()));
           break;
         }
 
@@ -169,9 +172,11 @@ namespace mc {
     auto LTLToBuchi(Formula<AP> const& formula) {
       using Formula = Formula<AP>;
       using LTLNode = _details_::LTLNode<AP>;
-      using Kripke = Kripke<LTLNode, AP>;
+      using NNFAP = std::pair<bool, AP>;
+      using Kripke = Kripke<LTLNode, NNFAP>;
 
       auto_set<Formula> untilSet{}; // Used for generating the fairness characteristic functions
+      auto_set<NNFAP> nnfSet{};
 
       std::unordered_map<int, LTLNode> closed{};
       std::unordered_map<int, LTLNode> open{};
@@ -190,7 +195,7 @@ namespace mc {
         } else {
           auto [psiIter,_] = q.nowSet.insert(std::move(*(q.newSet.begin())));
           q.newSet.erase(q.newSet.begin());
-          _details_::UpdateSplit(open, nodeRelations, untilSet, q, *psiIter);
+          _details_::UpdateSplit(open, nodeRelations, untilSet, nnfSet, q, *psiIter);
         }
       }
 
@@ -220,13 +225,15 @@ namespace mc {
             return nextSet;
           },
           fairnessConstraints,
-          [](LTLNode const& node, AP const& ap) {
+          [](LTLNode const& node, NNFAP const& nnfAP) {
+            auto const& [truth, ap] = nnfAP;
             for (auto& sub : node.nowSet) {
-              if (sub.form() == FormulaForm::Atomic && sub.getAP() == ap) return true;
+              if (sub.form() == FormulaForm::Atomic && sub.getAP() == ap) return truth;
+              if (sub.form() == FormulaForm::Not && sub.getSubformulas()[0].getAP() == ap) return !truth;
             }
             return false;
           }),
-        formula.getAPSet());
+        nnfSet);
     }
   }
 }

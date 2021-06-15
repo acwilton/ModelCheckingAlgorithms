@@ -4,7 +4,7 @@
 #include "kripke.hh"
 #include "buchi.hh"
 #include "ltl.hh"
-#include "ltl_normalize.hh"
+#include "ltl_utils.hh"
 #include "kripke_to_buchi.hh"
 #include "ltl_to_buchi.hh"
 #include "buchi_utils.hh"
@@ -12,15 +12,17 @@
 
 namespace mc {
   template <typename State, typename AP>
-  std::optional<Lasso<State>> ModelCheck(Kripke<State, AP> const& kripke, ltl::Formula<AP> const& spec) {
-    auto normalizedSpec = ltl::Normalize(spec);
+  std::optional<Lasso<State>> ModelCheck(Kripke<State, AP> const& kripke, ltl::Formula<AP> const& normalizedSpec) {
     auto kripke_buchi = KripkeToBuchi(kripke, normalizedSpec.getAPSet());
     auto ltl_buchi = ltl::LTLToBuchi(normalizedSpec);
+    using KripkeAlphabet = typename decltype(kripke_buchi)::AlphabetType;
+    using LTLAlphabet = typename decltype(ltl_buchi)::AlphabetType;
 
     // This functor determines if the set of APs appearing on a transition in ltl_buchi is a subset of the APs appearing on a transition in kripke_buchi. If so then we should be able to take this transition in the intersection.
-    auto specAPSubsetKripkeAP = [](auto_set<AP> const& kripkeAPs, auto_set<AP> const& specAPs) {
-      for (auto& ap : specAPs) {
-        if (kripkeAPs.count(ap) == 0) {
+    auto specAPSubsetKripkeAP = [](KripkeAlphabet const& kripkeAPs, LTLAlphabet const& specAPs) {
+      for (auto& [truth, ap] : specAPs) {
+        bool containsAP = (kripkeAPs.count(ap) == 1);
+        if (containsAP != truth) {
           return false;
         }
       }

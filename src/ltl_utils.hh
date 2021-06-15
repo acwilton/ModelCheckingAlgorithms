@@ -1,5 +1,7 @@
-#ifndef LTL_NORMALIZE_HH
-#define LTL_NORMALIZE_HH
+#ifndef LTL_UTILS_HH
+#define LTL_UTILS_HH
+
+#include <functional>
 
 #include "ltl.hh"
 
@@ -73,6 +75,76 @@ namespace mc {
         case FormulaForm::Not:
           return Normalize(sub.getSubformulas()[0]);
         }
+      }
+    }
+
+    template <typename AP>
+    Formula<AP> Compress(Formula<AP> const& formula,
+                         std::function<AP(AP)> notComp
+                         = [](AP ap) {
+                           return [ap](auto const& s) {
+                             return !ap(s);
+                           };
+                         },
+                         std::function<AP(AP,AP)> orComp
+                         = [](AP ap1, AP ap2) {
+                           return [ap1, ap2](auto const& s) {
+                             return ap1(s) || ap2(s);
+                           };
+                         },
+                         std::function<AP(AP,AP)> andComp
+                         = [](AP ap1, AP ap2) {
+                           return [ap1, ap2](auto const& s) {
+                             return ap1(s) && ap2(s);
+                           };
+                         })
+    {
+      switch(formula.form()) {
+      case FormulaForm::Atomic:
+        return formula;
+
+      case FormulaForm::Not: {
+        auto compSub = Compress(formula.getSubformulas()[0], notComp, orComp, andComp);
+        return (compSub.form() == FormulaForm::Atomic)
+          ? make_atomic<AP>(notComp(compSub.getAP()))
+          : make_not<AP>(compSub);
+      }
+
+      case FormulaForm::Or: {
+        auto compSub1 = Compress(formula.getSubformulas()[0], notComp, orComp, andComp);
+        auto compSub2 = Compress(formula.getSubformulas()[1], notComp, orComp, andComp);
+        return (compSub1.form() == FormulaForm::Atomic
+                && compSub2.form() == FormulaForm::Atomic)
+          ? make_atomic<AP>(orComp(compSub1.getAP(), compSub2.getAP()))
+          : make_or(compSub1, compSub2);
+      }
+
+      case FormulaForm::And: {
+        auto compSub1 = Compress(formula.getSubformulas()[0], notComp, orComp, andComp);
+        auto compSub2 = Compress(formula.getSubformulas()[1], notComp, orComp, andComp);
+        return (compSub1.form() == FormulaForm::Atomic
+                && compSub2.form() == FormulaForm::Atomic)
+          ? make_atomic<AP>(andComp(compSub1.getAP(), compSub2.getAP()))
+          : make_and(compSub1, compSub2);
+      }
+
+      case FormulaForm::Until: {
+        return make_until(Compress(formula.getSubformulas()[0], notComp, orComp, andComp),
+                          Compress(formula.getSubformulas()[1], notComp, orComp, andComp));
+      }
+
+      case FormulaForm::Release: {
+        return make_release(Compress(formula.getSubformulas()[0], notComp, orComp, andComp),
+                            Compress(formula.getSubformulas()[1], notComp, orComp, andComp));
+      }
+
+      case FormulaForm::Global: {
+        return make_global(Compress(formula.getSubformulas()[0], notComp, orComp, andComp));
+      }
+
+      case FormulaForm::Future: {
+        return make_future(Compress(formula.getSubformulas()[0], notComp, orComp, andComp));
+      }
       }
     }
   }

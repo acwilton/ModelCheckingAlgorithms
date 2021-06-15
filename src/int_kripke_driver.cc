@@ -424,23 +424,11 @@ int main(int argc, char* argv[]) {
   }
   stream.close();
 
-  /*
-  // Defining the Collatz graph (https://en.wikipedia.org/wiki/Collatz_conjecture#In_reverse)
-  // as a kripke structure except that all numbers are taken mod N (to make it finite)
-  Kripke<int> reverseCollatz(
-    {1}, // Start state is the number 1
-    [N](int x) {
-      auto_set<int> nextInts {(2*x) % N};
-      if (x % 6 == 4) {
-        nextInts.insert(((x - 1)/3) % N);
-      }
-      return nextInts;
-    });
-  */
-  auto spec = ltl::make_not(*opt_spec); // We negate so that we properly check for existance of counterexample
+  auto spec = ltl::make_not(*opt_spec); // We negate so that we properly check for existence of counterexample
+  auto processedSpec = ltl::Compress(ltl::Normalize(spec));
   auto kripke = *opt_kripke;
   
-  auto opt_lasso = ModelCheck(kripke, ltl::Normalize(spec));
+  auto opt_lasso = ModelCheck(kripke, processedSpec);
   if (opt_lasso) {
     std::cout << "The LTL specification does not hold.\n";
     const auto& [stem, loop] = *opt_lasso;

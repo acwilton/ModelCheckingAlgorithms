@@ -9,7 +9,6 @@ namespace mc {
   template <typename T>
   class EqFunction;
 
-  // REMOVE THIS COMMENT LATER: Don't augment to allow string == comparison. In parser, use string we would have used for == as a key into a map that maps to the appropriate EqFunction (of course if it doesn't exist yet then make it!)
   template <typename R, typename... Args>
   class EqFunction<R(Args...)> {
   public:
@@ -22,7 +21,8 @@ namespace mc {
     template <typename F>
     EqFunction(F f)
       : id(++count),
-        f(f)
+        f(f),
+        strRep(std::to_string(id))
       {}
 
     EqFunction& operator=(EqFunction const&) = default;
@@ -49,18 +49,27 @@ namespace mc {
       return static_cast<bool>(f);
     }
 
+    void setRepresentation(std::string newRep) {
+      strRep = newRep;
+    }
+
+    std::string getRepresentation() const {
+      return strRep;
+    }
+
     template <typename F>
     friend std::ostream& operator<<(std::ostream& stream, EqFunction<F> const& func);
   private:
     inline static int count = 0;
 
     int id;
+    std::string strRep;
     std::function<R(Args...)> f;
   };
 
   template <typename T>
   std::ostream& operator<<(std::ostream& stream, EqFunction<T> const& func) {
-    stream << func.id;
+    stream << func.getRepresentation();
     return stream;
   }
 }

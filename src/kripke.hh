@@ -9,6 +9,8 @@ namespace mc {
   template <typename State, typename AP = EqFunction<bool(State const&)>>
   class Kripke {
   public:
+    using StateType = State;
+    using APType = AP;
     using StateSet = auto_set<State>;
     using StateTransitions = std::function<auto_set<State>(State const&)>;
     using StateCharFunc = std::function<bool(State const&)>;

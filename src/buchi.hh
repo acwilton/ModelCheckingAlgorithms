@@ -2,7 +2,6 @@
 #define BUCHI_HH
 
 #include <vector>
-#include <map>
 #include <functional>
 
 #include "auto_set.hh"
@@ -12,6 +11,8 @@ namespace mc {
   template <typename State, typename Alphabet>
   class Buchi {
   public:
+    using StateType = State;
+    using AlphabetType = Alphabet;
     using StateSet = auto_set<State>;
     using TransitionSet = auto_set<std::pair<Alphabet,State>>;
     using StateTransitions = std::function<TransitionSet(State const&)>;

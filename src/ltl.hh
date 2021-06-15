@@ -38,30 +38,17 @@ namespace mc {
 
     template <typename AP>
     Formula<AP> make_not(Formula<AP> const& sub1) {
-      return (sub1.form() == FormulaForm::Atomic)
-        ? make_atomic<AP>([ap = sub1.getAP()](auto const& s) {
-            return !ap(s);
-          })
-        : Formula<AP>(FormulaForm::Not, sub1);
+      return Formula<AP>(FormulaForm::Not, sub1);
     }
 
     template <typename AP>
     Formula<AP> make_or(Formula<AP> const& sub1, Formula<AP> const& sub2) {
-      return (sub1.form() == FormulaForm::Atomic && sub2.form() == FormulaForm::Atomic)
-        ? make_atomic<AP>([ap1 = sub1.getAP(), ap2 = sub2.getAP()](auto const& s) {
-            return ap1(s) || ap2(s);
-          })
-        : Formula<AP>(FormulaForm::Or, sub1, sub2);
+      return Formula<AP>(FormulaForm::Or, sub1, sub2);
     }
 
     template <typename AP>
     Formula<AP> make_and(Formula<AP> const& sub1, Formula<AP> const& sub2) {
-
-      return (sub1.form() == FormulaForm::Atomic && sub2.form() == FormulaForm::Atomic)
-        ? make_atomic<AP>([ap1 = sub1.getAP(), ap2 = sub2.getAP()](auto const& s) {
-            return ap1(s) && ap2(s);
-          })
-        : Formula<AP>(FormulaForm::And, sub1, sub2);
+      return Formula<AP>(FormulaForm::And, sub1, sub2);
     }
 
     template <typename AP>
