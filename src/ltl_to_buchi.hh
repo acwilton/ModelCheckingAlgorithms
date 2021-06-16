@@ -50,11 +50,12 @@ namespace mc {
 
       template <typename T>
       std::ostream& operator<<(std::ostream& stream, LTLNode<T> const& ltlNode) {
-        stream << ltlNode.id << "{ ";
+        stream << ltlNode.id;/* << "{ ";
         for (auto formula : ltlNode.nowSet) {
           stream << formula << " | ";
         }
         stream << "}";
+                             */
         return stream;
       }
 

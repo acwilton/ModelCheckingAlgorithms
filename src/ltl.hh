@@ -156,11 +156,6 @@ namespace mc {
       auto_set<AP> apSet;
     };
 
-    template <typename AP>
-    inline const auto False = make_atomic<AP>([](auto const&) { return false; });
-    template <typename AP>
-    inline const auto True = make_atomic<AP>([](auto const&) { return true; });
-
     template <typename T>
     std::ostream& operator<< (std::ostream& stream, Formula<T> const& formula) {
       std::stringstream formStringStream;

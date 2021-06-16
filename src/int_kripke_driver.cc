@@ -14,6 +14,8 @@
 #include "ltl.hh"
 #include "model_check.hh"
 
+#include "buchi_printer.hh"
+
 using namespace mc;
 
 using AP = EqFunction<bool(int const&)>;
@@ -23,21 +25,22 @@ namespace parser {
   class ArithmeticParser {
   public:
     using ArithType = std::function<int(int)>;
+    using ReturnType = std::pair<ArithType, std::string>;
 
     ArithmeticParser(int N)
       : N(N)
       {}
     ~ArithmeticParser() = default;
 
-    std::optional<ArithType> operator()(ParserStream& pStream) const {
+    std::optional<ReturnType> operator()(ParserStream& pStream) const {
       if (pStream.match_token(VAR)) {
-        return std::make_optional([](int s) { return s; });
+        return std::make_optional(std::make_pair([](int s) { return s; }, "s"));
       } else if(pStream.match_token(CAP)) {
-        return std::make_optional([N=this->N](int) { return N; });
+        return std::make_optional(std::make_pair([N=this->N](int) { return N; }, "N"));
       } else if (auto opt_num = match_integer(pStream); opt_num) {
-        return std::make_optional([retNum = *opt_num](int) { return retNum; });
+        return std::make_optional(std::make_pair([retNum = *opt_num](int) { return retNum; }, std::to_string(*opt_num)));
       } else if (pStream.match_token(LPAREN)) {
-        std::optional<ArithType> retVal;
+        std::optional<ReturnType> retVal;
 
         auto errMsgGen = [](std::string operationName) {
           return [operationName](int i) {
@@ -47,14 +50,16 @@ namespace parser {
         };
 
         auto parseOperation = [this,&pStream,&errMsgGen](std::function<int(int,int)>const& operation, std::string opName)
-          -> std::optional<ArithType> {
-          auto opt_operands = parseN<2,ArithType>(*this, pStream, errMsgGen(opName));
-          return !opt_operands
-          ? std::nullopt
-          : std::make_optional([operation, opt_operands](int x) {
-            auto& [l, r] = *opt_operands;
-            return operation(l(x), r(x));
-          });
+          -> std::optional<ReturnType> {
+          if (auto opt_operands = parseN<2, ReturnType>(*this, pStream, errMsgGen(opName)); opt_operands) {
+            auto& [lPair, rPair] = *opt_operands;
+            auto [l, lStr] = lPair;
+            auto [r, rStr] = rPair;
+            return std::make_optional(std::make_pair([operation, l=l, r=r](int x) {
+              return operation(l(x), r(x));
+            }, "("+opName+" "+lStr+" "+rStr+")"));
+          }
+          return std::nullopt;
         };
 
         if (pStream.match_token(PLUS)) {
@@ -102,13 +107,14 @@ namespace parser {
   class ComparisonParser{
   public:
     using CompType = std::function<bool(int)>;
+    using ReturnType = std::pair<CompType, std::string>;
 
     ComparisonParser(int N)
       : arithParser(N)
       {}
     ~ComparisonParser() = default;
 
-    std::optional<CompType> operator()(ParserStream& pStream) const {
+    std::optional<ReturnType> operator()(ParserStream& pStream) const {
       auto errMsgGen = [](std::string comparisonName) {
         return [comparisonName](int i) {
           std::string posString = (i == 0) ? "left" : "right";
@@ -117,14 +123,16 @@ namespace parser {
       };
 
       auto parseComparison = [&arithParser=this->arithParser,&pStream,&errMsgGen](std::function<int(int,int)>const& comparison, std::string compName)
-        -> std::optional<CompType> {
-        auto opt_operands = parseN<2,ArithmeticParser::ArithType>(arithParser, pStream, errMsgGen(compName));
-        return !opt_operands
-        ? std::nullopt
-        : std::make_optional([comparison, opt_operands](int x) {
-          auto& [l, r] = *opt_operands;
-          return comparison(l(x), r(x));
-        });
+        -> std::optional<ReturnType> {
+        if (auto opt_operands = parseN<2,ArithmeticParser::ReturnType>(arithParser, pStream, errMsgGen(compName)); opt_operands) {
+          auto& [lPair, rPair] = *opt_operands;
+          auto [l, lStr] = lPair;
+          auto [r, rStr] = rPair;
+          return std::make_optional(std::make_pair([comparison, l=l, r=r](int x) {
+            return comparison(l(x), r(x));
+          }, "("+compName+" "+lStr+" "+rStr+")"));
+        }
+        return std::nullopt;
       };
       if (pStream.match_token(EQUALS)) {
         return parseComparison(std::equal_to<int>{}, "==");
@@ -162,10 +170,13 @@ namespace parser {
     ~IntAPParser() = default;
 
     std::optional<Formula> operator()(ParserStream& pStream) {
-      auto opt_func = compParser(pStream);
-      return !opt_func
-        ? std::nullopt
-        : std::make_optional(ltl::make_atomic<AP>(*opt_func));
+      if (auto opt_func = compParser(pStream); opt_func) {
+        auto& [func, funcStr] = *opt_func;
+        AP intAP (func);
+        intAP.setRepresentation(funcStr);
+        return std::make_optional(ltl::make_atomic<AP>(intAP));
+      }
+      return std::nullopt;
     }
 
   private:
@@ -178,9 +189,7 @@ namespace parser {
     using CharFuncType = std::function<bool(int const&)>;
     using TransSetType = std::pair<auto_set<CharFuncType>, auto_set<TransFuncType>>;
     IntKripkeParser(int N)
-      : N(N),
-        apParser(N),
-        ltlParser(apParser)
+      : N(N)
       {
         ComparisonParser compParser(N);
         charFuncParser = [compParser](ParserStream& pStream) -> std::optional<CharFuncType> {
@@ -198,7 +207,8 @@ namespace parser {
             pStream.reportError("Expected ) at end of boolean function.");
             return std::nullopt;
           }
-          return [charFun = *opt_charFun](const int& s) {
+          auto [charFun, _] = *opt_charFun;
+          return [charFun=charFun](const int& s) {
             return charFun(s);
           };
         };
@@ -208,7 +218,11 @@ namespace parser {
           if (auto opt_int = match_integer(pStream); opt_int) {
             return [v = *opt_int](int) { return v; };
           }
-          return arithParser(pStream);
+          if (auto opt_arithFunc = arithParser(pStream); opt_arithFunc) {
+            auto [arithFunc, _] = *opt_arithFunc;
+            return std::make_optional(arithFunc);
+          }
+          return std::nullopt;
         };
       }
     ~IntKripkeParser() = default;
@@ -352,8 +366,6 @@ namespace parser {
     int N;
     Parser<TransFuncType> transFuncParser;
     Parser<CharFuncType> charFuncParser;
-    IntAPParser apParser;
-    LTLParser<AP> ltlParser;
   };
 }
 
@@ -425,9 +437,60 @@ int main(int argc, char* argv[]) {
   stream.close();
 
   auto spec = ltl::make_not(*opt_spec); // We negate so that we properly check for existence of counterexample
-  auto processedSpec = ltl::Compress(ltl::Normalize(spec));
+  std::cout << "Negated LTL: " << spec << "\n";
+  std::function<AP(AP)> notCompress = [](AP ap) {
+    AP notAP([ap](int s) { return !ap(s); });
+    notAP.setRepresentation("(! "+ap.getRepresentation()+")");
+    return notAP;
+  };
+  std::function<AP(AP,AP)> orCompress = [](AP ap1, AP ap2) {
+    AP orAP([ap1,ap2](int s) { return ap1(s) || ap2(s); });
+    orAP.setRepresentation("(|| "+ap1.getRepresentation()+" "+ap2.getRepresentation()+")");
+    return orAP;
+  };
+  std::function<AP(AP,AP)> andCompress = [](AP ap1, AP ap2) {
+    AP andAP([ap1,ap2](int s) { return ap1(s) && ap2(s); });
+    andAP.setRepresentation("(&& "+ap1.getRepresentation()+" "+ap2.getRepresentation()+")");
+    return andAP;
+  };
+
+  AP trueAP([](auto const& s) { return true; });
+  trueAP.setRepresentation("true");
+  AP falseAP([](auto const& s) { return false; });
+  falseAP.setRepresentation("false");
+  auto processedSpec = ltl::Compress(ltl::Normalize(spec, trueAP, falseAP), notCompress, orCompress, andCompress);
+  std::cout << "Normalized LTL: " << processedSpec << "\n";
+
+  auto ltlBuchi = ltl::LTLToBuchi(processedSpec);
+  std::cout << "LTL Buchi:\n";
+  std::function<std::string(typename decltype(ltlBuchi)::AlphabetType)> ltlBuchiAlphabetToString = [](auto labelSet) {
+    std::stringstream labelStream;
+    for (auto const& [truth, ap] : labelSet) {
+      if (!truth) labelStream << "(! ";
+      labelStream << ap;
+      if (!truth) labelStream << ")";
+      labelStream << ", ";
+    }
+    std::string labelStr = labelStream.str();
+    return "{" + labelStr.substr(0,labelStr.size()-2) + "}";
+  };
+  std::function<std::string(typename decltype(ltlBuchi)::StateType)> ltlBuchiStateToString = [](auto statePair) {
+    std::stringstream stateStream;
+    auto& [opt_state, index] = statePair;
+    stateStream << "(";
+    if (opt_state) {
+      stateStream << *opt_state;
+    } else {
+      stateStream << "INIT";
+    }
+    stateStream << ", " << index << ")";
+    return stateStream.str();
+  };
+  PrintBuchi(std::cout, ltlBuchi, ltlBuchiAlphabetToString);//, ltlBuchiStateToString);
+  std::cout << "\n";
+
   auto kripke = *opt_kripke;
-  
+
   auto opt_lasso = ModelCheck(kripke, processedSpec);
   if (opt_lasso) {
     std::cout << "The LTL specification does not hold.\n";

@@ -4,7 +4,6 @@
 #include <utility>
 #include <functional>
 #include <unordered_map>
-#include <map>
 #include <type_traits>
 
 #include "auto_traits.hh"
@@ -15,7 +14,6 @@ namespace mc {
    * A class representing a (unordered) map that is compatible with most types.
    * The underlying representation for the map is automatically chosen at compile time.
    * If K is hashable then it uses std::unordered_map,
-   * else if K is comparable with operator< then it uses std::map,
    * else it chooses the simple_map representation which works with any type with ==.
    */
   template <typename K, typename V>
@@ -24,8 +22,7 @@ namespace mc {
     using value_type = std::pair<const K, V>;
     // The conditional check to determine which underlying representation to use
     using map_representation =
-      std::conditional_t<traits::hashable<K>::value, std::unordered_map<K,V>,
-                       std::conditional_t<traits::comparable<K>::value, std::map<K,V>, simple_map<K,V>>>;
+      std::conditional_t<traits::hashable<K>::value, std::unordered_map<K,V>, simple_map<K,V>>;
     using iterator = typename map_representation::iterator;
     using const_iterator = typename map_representation::const_iterator;
 

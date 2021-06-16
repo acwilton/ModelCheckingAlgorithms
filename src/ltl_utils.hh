@@ -9,37 +9,39 @@ namespace mc {
   namespace ltl {
     // Puts formula into NNF and removes G's and F's using equivalences to R and U
     template <typename AP>
-    Formula<AP> Normalize(Formula<AP> const& formula) {
-      auto True = ltl::True<AP>;
-      auto False = ltl::False<AP>;
+    Formula<AP> Normalize(Formula<AP> const& formula,
+                          AP const& trueAP = [](auto const&) { return true; },
+                          AP const& falseAP = [](auto const&) { return false; }) {
+      auto True = make_atomic<AP>(trueAP);
+      auto False = make_atomic<AP>(falseAP);
 
       switch(formula.form()) {
       case FormulaForm::Atomic:
         return formula;
 
       case FormulaForm::Until:
-        return make_until(Normalize(formula.getSubformulas()[0]),
-                          Normalize(formula.getSubformulas()[1]));
+        return make_until(Normalize(formula.getSubformulas()[0], trueAP, falseAP),
+                          Normalize(formula.getSubformulas()[1], trueAP, falseAP));
 
       case FormulaForm::Release:
-        return make_release(Normalize(formula.getSubformulas()[0]),
-                            Normalize(formula.getSubformulas()[1]));
+        return make_release(Normalize(formula.getSubformulas()[0], trueAP, falseAP),
+                            Normalize(formula.getSubformulas()[1], trueAP, falseAP));
 
       case FormulaForm::Global:
         // (G f) = (R false f)
-        return make_release(False, Normalize(formula.getSubformulas()[0]));
+        return make_release(False, Normalize(formula.getSubformulas()[0], trueAP, falseAP));
 
       case FormulaForm::Future:
         // (F f) = (U true f)
-        return make_until(True, Normalize(formula.getSubformulas()[0]));
+        return make_until(True, Normalize(formula.getSubformulas()[0], trueAP, falseAP));
 
       case FormulaForm::Or:
-        return make_or(Normalize(formula.getSubformulas()[0]),
-                       Normalize(formula.getSubformulas()[1]));
+        return make_or(Normalize(formula.getSubformulas()[0], trueAP, falseAP),
+                       Normalize(formula.getSubformulas()[1], trueAP, falseAP));
 
       case FormulaForm::And:
-        return make_and(Normalize(formula.getSubformulas()[0]),
-                        Normalize(formula.getSubformulas()[1]));
+        return make_and(Normalize(formula.getSubformulas()[0], trueAP, falseAP),
+                        Normalize(formula.getSubformulas()[1], trueAP, falseAP));
 
       case FormulaForm::Not:
         auto sub = formula.getSubformulas()[0];
@@ -49,31 +51,31 @@ namespace mc {
           return formula;
 
         case FormulaForm::Until:
-          return make_release(Normalize(make_not(sub.getSubformulas()[0])),
-                              Normalize(make_not(sub.getSubformulas()[1])));
+          return make_release(Normalize(make_not(sub.getSubformulas()[0]), trueAP, falseAP),
+                              Normalize(make_not(sub.getSubformulas()[1]), trueAP, falseAP));
 
         case FormulaForm::Release:
-          return make_until(Normalize(make_not(sub.getSubformulas()[0])),
-                            Normalize(make_not(sub.getSubformulas()[1])));
+          return make_until(Normalize(make_not(sub.getSubformulas()[0]), trueAP, falseAP),
+                            Normalize(make_not(sub.getSubformulas()[1]), trueAP, falseAP));
 
         case FormulaForm::Global:
           // (! (G f)) = (F (! f)) = (U true (! f))
-          return make_until(True, Normalize(make_not(sub.getSubformulas()[0])));
+          return make_until(True, Normalize(make_not(sub.getSubformulas()[0]), trueAP, falseAP));
 
         case FormulaForm::Future:
           // (! (F f)) = (G (! f)) = (R false (! f))
-          return make_release(False, Normalize(make_not(sub.getSubformulas()[0])));
+          return make_release(False, Normalize(make_not(sub.getSubformulas()[0]), trueAP, falseAP));
 
         case FormulaForm::And:
-          return make_or(Normalize(make_not(sub.getSubformulas()[0])),
-                         Normalize(make_not(sub.getSubformulas()[1])));
+          return make_or(Normalize(make_not(sub.getSubformulas()[0]), trueAP, falseAP),
+                         Normalize(make_not(sub.getSubformulas()[1]), trueAP, falseAP));
 
         case FormulaForm::Or:
-          return make_and(Normalize(make_not(sub.getSubformulas()[0])),
-                          Normalize(make_not(sub.getSubformulas()[1])));
+          return make_and(Normalize(make_not(sub.getSubformulas()[0]), trueAP, falseAP),
+                          Normalize(make_not(sub.getSubformulas()[1]), trueAP, falseAP));
 
         case FormulaForm::Not:
-          return Normalize(sub.getSubformulas()[0]);
+          return Normalize(sub.getSubformulas()[0], trueAP, falseAP);
         }
       }
     }
